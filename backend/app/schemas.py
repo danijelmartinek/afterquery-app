@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 def _to_camel(string: str) -> str:
@@ -18,9 +18,11 @@ def _to_camel(string: str) -> str:
 class CamelModel(BaseModel):
     """Base model that renders JSON keys using ``camelCase``."""
 
-    class Config:
-        alias_generator = _to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(
+        alias_generator=_to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
 
 
 class SeedSummary(BaseModel):
@@ -52,8 +54,7 @@ class OrgRead(OrgCreate):
     id: str = Field(..., description="Org UUID")
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SeedCreate(BaseModel):
@@ -69,8 +70,7 @@ class SeedRead(SeedCreate):
     id: str
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssessmentCreate(BaseModel):
@@ -90,8 +90,7 @@ class AssessmentRead(AssessmentCreate):
     id: str
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvitationCreate(BaseModel):
@@ -115,8 +114,7 @@ class InvitationRead(BaseModel):
     start_link_token: str
     sent_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CandidateRepoRead(BaseModel):
@@ -130,8 +128,7 @@ class CandidateRepoRead(BaseModel):
     archived: bool
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StartAssessmentResponse(BaseModel):
@@ -166,8 +163,7 @@ class InvitationDetail(BaseModel):
     submitted_at: Optional[datetime]
     expired_at: Optional[datetime]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminUser(CamelModel):

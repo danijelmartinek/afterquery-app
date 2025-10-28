@@ -16,7 +16,8 @@ import jwt
 from jwt import algorithms
 from dotenv import find_dotenv, load_dotenv
 from fastapi import Depends, Header, HTTPException, status
-from pydantic import BaseSettings, Field, ValidationError
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings
 
 # Ensure environment variables from ``.env`` are loaded when this module is
 # imported. This mirrors the behavior used for the database configuration and
