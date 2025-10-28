@@ -24,6 +24,17 @@ if _DOTENV_PATH:
     load_dotenv(_DOTENV_PATH)
 
 
+_MISSING_ENVIRONMENT_HINTS: Mapping[str, str] = {
+    "api_key": "RESEND_API_KEY",
+    "from_email": "RESEND_FROM_EMAIL",
+    "from_name": "RESEND_FROM_NAME",
+    "reply_to_email": "RESEND_REPLY_TO_EMAIL",
+    "candidate_app_url": "CANDIDATE_APP_URL or NEXT_PUBLIC_CANDIDATE_APP_URL",
+    "api_base_url": "RESEND_API_BASE_URL",
+    "request_timeout_seconds": "RESEND_HTTP_TIMEOUT_SECONDS",
+}
+
+
 class ResendSettings(BaseSettings):
     """Configuration required to send transactional email via Resend."""
 
@@ -31,7 +42,10 @@ class ResendSettings(BaseSettings):
     from_email: str = Field(..., env="RESEND_FROM_EMAIL")
     from_name: Optional[str] = Field(None, env="RESEND_FROM_NAME")
     reply_to_email: Optional[str] = Field(None, env="RESEND_REPLY_TO_EMAIL")
-    candidate_app_url: str = Field(..., env="CANDIDATE_APP_URL")
+    candidate_app_url: str = Field(
+        ...,
+        env=("CANDIDATE_APP_URL", "NEXT_PUBLIC_CANDIDATE_APP_URL"),
+    )
     api_base_url: str = Field("https://api.resend.com", env="RESEND_API_BASE_URL")
     request_timeout_seconds: float = Field(10.0, env="RESEND_HTTP_TIMEOUT_SECONDS")
 
@@ -45,7 +59,18 @@ def get_resend_settings() -> ResendSettings:
     try:
         return ResendSettings()
     except ValidationError as exc:  # pragma: no cover - configuration error
-        raise RuntimeError("Resend environment variables are not configured") from exc
+        missing_names: list[str] = []
+        for error in exc.errors():
+            if error.get("type") != "missing":
+                continue
+            field_name = str(error.get("loc", ("?",))[0])
+            env_name = _MISSING_ENVIRONMENT_HINTS.get(field_name, field_name)
+            missing_names.append(env_name)
+        missing = ", ".join(missing_names)
+        detail = "Resend environment variables are not configured"
+        if missing:
+            detail = f"{detail}: missing {missing}"
+        raise RuntimeError(detail) from exc
 
 
 class EmailServiceError(RuntimeError):
