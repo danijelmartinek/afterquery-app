@@ -13,9 +13,9 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
 import httpx
 import jwt
+from jwt import algorithms
 from dotenv import find_dotenv, load_dotenv
 from fastapi import Depends, Header, HTTPException, status
-from jwt.algorithms import RSAAlgorithm
 from pydantic import BaseSettings, Field, ValidationError
 
 # Ensure environment variables from ``.env`` are loaded when this module is
@@ -192,8 +192,12 @@ class SupabaseAuth:
         except KeyError as exc:
             raise SupabaseAuthError("Supabase signing key not found; try logging in again") from exc
 
+        rsa_algorithm = algorithms.get_default_algorithms().get("RS256")
+        if rsa_algorithm is None:  # pragma: no cover - algorithm missing in PyJWT build
+            raise SupabaseAuthError("Supabase RSA algorithm support is unavailable")
+
         try:
-            rsa_key = RSAAlgorithm.from_jwk(json.dumps(dict(key_data)))
+            rsa_key = rsa_algorithm.from_jwk(json.dumps(dict(key_data)))
         except (TypeError, ValueError) as exc:  # pragma: no cover - invalid JWKS response
             raise SupabaseAuthError("Supabase signing key is invalid") from exc
 
