@@ -55,17 +55,24 @@ def get_supabase_auth_settings() -> SupabaseAuthSettings:
 class _JWKSCache:
     """Caches Supabase JWKS responses to avoid fetching keys on every request."""
 
-    def __init__(self, jwks_url: str, ttl_seconds: int, timeout: float) -> None:
+    def __init__(
+        self,
+        jwks_url: str,
+        ttl_seconds: int,
+        timeout: float,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         self._jwks_url = jwks_url
         self._ttl_seconds = ttl_seconds
         self._timeout = timeout
         self._lock = asyncio.Lock()
         self._expires_at: float = 0.0
         self._keys: dict[str, Mapping[str, Any]] = {}
+        self._headers = dict(headers or {})
 
     async def _refresh(self) -> None:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(self._jwks_url)
+            response = await client.get(self._jwks_url, headers=self._headers or None)
             response.raise_for_status()
             payload = response.json()
 
@@ -170,10 +177,15 @@ class SupabaseAuth:
     def __init__(self, settings: SupabaseAuthSettings) -> None:
         self._settings = settings
         jwks_url = settings.supabase_url.rstrip("/") + "/auth/v1/jwks"
+        headers = {
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {settings.supabase_anon_key}",
+        }
         self._jwks_cache = _JWKSCache(
             jwks_url=jwks_url,
             ttl_seconds=settings.supabase_jwks_ttl_seconds,
             timeout=settings.supabase_http_timeout_seconds,
+            headers=headers,
         )
 
     async def _decode_token(self, token: str) -> Mapping[str, Any]:
