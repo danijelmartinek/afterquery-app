@@ -42,7 +42,8 @@ type AdminDataAction =
   | {
       type: "updateInvitationStatus";
       payload: { invitationId: string; status: Invitation["status"]; submittedAt?: string };
-    };
+    }
+  | { type: "upsertEmailTemplate"; payload: EmailTemplate };
 
 type WorkspaceStatus = "loading" | "needs_org" | "pending_approval" | "ready";
 
@@ -100,6 +101,21 @@ function reducer(state: AdminDataState, action: AdminDataAction): AdminDataState
             : invitation,
         ),
       };
+    case "upsertEmailTemplate": {
+      const filtered = state.emailTemplates.filter((template) => {
+        if (template.id === action.payload.id) {
+          return false;
+        }
+        if (action.payload.key && template.key === action.payload.key) {
+          return false;
+        }
+        return true;
+      });
+      return {
+        ...state,
+        emailTemplates: [action.payload, ...filtered],
+      };
+    }
     default:
       return state;
   }

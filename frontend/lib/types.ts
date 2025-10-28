@@ -137,6 +137,7 @@ export type OrgProfile = {
 export type EmailTemplate = {
   id: string;
   orgId: string;
+  key: string | null;
   name: string;
   subject: string | null;
   body: string | null;

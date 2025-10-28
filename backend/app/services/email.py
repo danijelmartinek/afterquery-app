@@ -12,6 +12,7 @@ from typing import Mapping, Optional, Sequence
 
 import httpx
 from dotenv import find_dotenv, load_dotenv
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models
@@ -51,6 +52,31 @@ _OPTIONAL_ENVIRONMENT_KEYS: Mapping[str, Sequence[str]] = {
     "reply_to_email": ("RESEND_REPLY_TO_EMAIL",),
     "api_base_url": ("RESEND_API_BASE_URL",),
     "request_timeout_seconds": ("RESEND_HTTP_TIMEOUT_SECONDS",),
+}
+
+
+CANDIDATE_ASSESSMENT_STARTED_TEMPLATE_KEY = "candidate_assessment_started"
+CANDIDATE_ASSESSMENT_SUBMITTED_TEMPLATE_KEY = "candidate_submission_received"
+
+
+_STATUS_TEMPLATE_CONFIG: dict[models.EmailEventType, dict[str, str]] = {
+    models.EmailEventType.assessment_started: {
+        "key": CANDIDATE_ASSESSMENT_STARTED_TEMPLATE_KEY,
+        "default_subject": "Your assessment is underway",
+        "default_body": (
+            "Hi {candidate_name}, we're excited to see your progress on {assessment_title}.\n\n"
+            "You can keep working in your project repository: {candidate_repo_url}.\n"
+            "Remember to submit before {complete_deadline}."
+        ),
+    },
+    models.EmailEventType.submission_received: {
+        "key": CANDIDATE_ASSESSMENT_SUBMITTED_TEMPLATE_KEY,
+        "default_subject": "Thanks for submitting {assessment_title}",
+        "default_body": (
+            "Hi {candidate_name}, thanks for submitting {assessment_title}.\n\n"
+            "We'll review your work and follow up soon."
+        ),
+    },
 }
 
 
@@ -139,6 +165,39 @@ class ResendEmailService:
         base = self._settings.normalized_candidate_base
         return f"{base}/candidates/{token}"
 
+    @staticmethod
+    def _format_deadline(value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M %Z")
+
+    def _build_base_context(
+        self,
+        invitation: models.Invitation,
+        assessment: models.Assessment,
+        *,
+        start_link: Optional[str] = None,
+    ) -> dict[str, str]:
+        context: dict[str, str] = {
+            "candidate_name": invitation.candidate_name or invitation.candidate_email,
+            "candidate_email": invitation.candidate_email,
+            "assessment_title": assessment.title,
+        }
+        if start_link:
+            context["start_link"] = start_link
+
+        optional_context = {
+            "start_deadline": self._format_deadline(invitation.start_deadline),
+            "complete_deadline": self._format_deadline(invitation.complete_deadline),
+            "started_at": self._format_deadline(invitation.started_at),
+            "submitted_at": self._format_deadline(invitation.submitted_at),
+        }
+        for key, value in optional_context.items():
+            if value:
+                context[key] = value
+
+        return context
+
     def _render_template(
         self,
         template: Optional[str],
@@ -172,32 +231,16 @@ class ResendEmailService:
             "{{start_link}}\n"
         )
 
-        def _format_deadline(value: Optional[datetime]) -> Optional[str]:
-            if value is None:
-                return None
-            return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M %Z")
+        context = self._build_base_context(
+            invitation, assessment, start_link=start_link
+        )
 
-        context: dict[str, str] = {
-            "candidate_name": invitation.candidate_name or invitation.candidate_email,
-            "candidate_email": invitation.candidate_email,
-            "assessment_title": assessment.title,
-            "start_link": start_link,
-        }
-
-        optional_context = {
-            "start_deadline": _format_deadline(invitation.start_deadline),
-            "complete_deadline": _format_deadline(invitation.complete_deadline),
-        }
-        for key, value in optional_context.items():
-            if value is not None:
-                context[key] = value
-
-        subject_template = assessment.candidate_email_subject or subject_default
+        subject_template = assessment.candidate_email_subject
         subject = self._render_template(
             subject_template, context, default=subject_default, include_start_link_fallback=False
         )
 
-        body_template = assessment.candidate_email_body or body_default
+        body_template = assessment.candidate_email_body
         text_body = self._render_template(
             body_template,
             context,
@@ -208,21 +251,22 @@ class ResendEmailService:
         html_body = "<br>".join(html.escape(part) for part in text_body.split("\n"))
         return subject.strip(), text_body.strip(), html_body
 
-    async def send_invitation_email(
+    async def _send_email(
         self,
-        session: AsyncSession,
-        payload: InvitationEmailPayload,
-    ) -> None:
-        subject, text_body, html_body = self._build_email_content(payload)
-        invitation = payload.invitation
-
+        to_email: str,
+        subject: str,
+        text_body: str,
+        html_body: str,
+        *,
+        context_label: str,
+    ) -> dict:
         headers = {
             "Authorization": f"Bearer {self._settings.api_key}",
             "Content-Type": "application/json",
         }
         json_payload: dict[str, object] = {
             "from": self._build_from_header(),
-            "to": [invitation.candidate_email],
+            "to": [to_email],
             "subject": subject,
             "text": text_body,
             "html": html_body,
@@ -235,14 +279,31 @@ class ResendEmailService:
             timeout=self._settings.request_timeout_seconds,
         ) as client:
             response = await client.post("/emails", json=json_payload, headers=headers)
+
         if response.status_code >= 400:
             detail = response.text
-            logger.error("Resend failed to send invitation email: %s", detail)
+            logger.error("Resend failed to send %s email: %s", context_label, detail)
             raise EmailServiceError(
-                f"Resend returned {response.status_code} while sending invitation email"
+                f"Resend returned {response.status_code} while sending {context_label} email"
             )
 
-        data = response.json()
+        return response.json()
+
+    async def send_invitation_email(
+        self,
+        session: AsyncSession,
+        payload: InvitationEmailPayload,
+    ) -> None:
+        subject, text_body, html_body = self._build_email_content(payload)
+        invitation = payload.invitation
+
+        data = await self._send_email(
+            invitation.candidate_email,
+            subject,
+            text_body,
+            html_body,
+            context_label="invitation",
+        )
         provider_id = str(data.get("id")) if data.get("id") is not None else None
 
         invitation.sent_at = datetime.now(timezone.utc)
@@ -256,6 +317,66 @@ class ResendEmailService:
         )
         session.add(email_event)
         await session.flush()
+
+    async def send_candidate_status_email(
+        self,
+        session: AsyncSession,
+        *,
+        invitation: models.Invitation,
+        assessment: models.Assessment,
+        event_type: models.EmailEventType,
+        extra_context: Optional[Mapping[str, Optional[str]]] = None,
+    ) -> bool:
+        config = _STATUS_TEMPLATE_CONFIG.get(event_type)
+        if config is None:
+            raise ValueError(f"Unsupported email event type: {event_type}")
+
+        result = await session.execute(
+            select(models.EmailTemplate)
+            .where(models.EmailTemplate.org_id == assessment.org_id)
+            .where(models.EmailTemplate.key == config["key"])
+        )
+        template = result.scalar_one_or_none()
+        if template is None:
+            logger.debug("Skipping %s email; no template configured", event_type.value)
+            return False
+
+        context = self._build_base_context(invitation, assessment)
+        if extra_context:
+            for key, value in extra_context.items():
+                if value:
+                    context[key] = value
+
+        subject_template = (template.subject or "").strip() or config["default_subject"]
+        body_template = (template.body or "").strip() or config["default_body"]
+
+        subject = self._render_template(
+            subject_template, context, default=config["default_subject"], include_start_link_fallback=False
+        )
+        text_body = self._render_template(
+            body_template, context, default=config["default_body"], include_start_link_fallback=False
+        )
+        html_body = "<br>".join(html.escape(part) for part in text_body.split("\n"))
+
+        data = await self._send_email(
+            invitation.candidate_email,
+            subject.strip(),
+            text_body.strip(),
+            html_body,
+            context_label=event_type.value,
+        )
+        provider_id = str(data.get("id")) if data.get("id") is not None else None
+
+        email_event = models.EmailEvent(
+            invitation_id=invitation.id,
+            type=event_type,
+            provider_id=provider_id,
+            to_email=invitation.candidate_email,
+            status=data.get("status") if isinstance(data.get("status"), str) else "sent",
+        )
+        session.add(email_event)
+        await session.flush()
+        return True
 
 
 @lru_cache

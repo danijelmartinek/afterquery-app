@@ -15,14 +15,66 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .. import models, schemas, utils
+from ..services.email import (
+    CANDIDATE_ASSESSMENT_STARTED_TEMPLATE_KEY,
+    CANDIDATE_ASSESSMENT_SUBMITTED_TEMPLATE_KEY,
+)
 from ..auth import SupabaseSession, require_roles
 from ..database import ASYNC_ENGINE, get_session
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+
+_EMAIL_TEMPLATE_METADATA: dict[str, dict[str, str]] = {
+    CANDIDATE_ASSESSMENT_STARTED_TEMPLATE_KEY: {
+        "name": "Assessment in progress",
+        "description": "Sent to candidates when they begin an assessment.",
+    },
+    CANDIDATE_ASSESSMENT_SUBMITTED_TEMPLATE_KEY: {
+        "name": "Submission received",
+        "description": "Sent to candidates after they submit their work.",
+    },
+}
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_PATH = _REPO_ROOT / "db" / "schema.sql"
 _DEMO_DATA_PATH = _REPO_ROOT / "db" / "demo_seed_data.json"
+
+
+def _email_template_to_schema(template: models.EmailTemplate) -> schemas.AdminEmailTemplate:
+    metadata = _EMAIL_TEMPLATE_METADATA.get(template.key or "")
+    name = metadata.get("name") if metadata else (template.key or (template.subject or "Template"))
+    description = metadata.get("description") if metadata else ""
+    return schemas.AdminEmailTemplate(
+        id=str(template.id),
+        org_id=str(template.org_id),
+        key=template.key,
+        name=name,
+        subject=template.subject,
+        body=template.body,
+        description=description,
+        updated_at=template.created_at,
+    )
+
+
+async def _resolve_org_for_email_templates(
+    session: AsyncSession, current_session: SupabaseSession
+) -> tuple[models.Org, Optional[models.OrgMember]]:
+    membership_result = await session.execute(
+        select(models.OrgMember)
+        .where(models.OrgMember.supabase_user_id == current_session.user.id)
+        .order_by(models.OrgMember.created_at)
+    )
+    membership = membership_result.scalars().first()
+
+    if membership is None:
+        if current_session.user.has_role("service_role"):
+            org = await _fetch_org(session)
+            return org, None
+        raise HTTPException(status_code=403, detail="Organization membership required")
+
+    org = await _fetch_org(session, membership.org_id)
+    return org, membership
 
 def _normalize_email(value: Optional[str]) -> Optional[str]:
     if value is None:
@@ -527,15 +579,7 @@ async def _build_admin_overview(
             for comment in review_comments
         ],
         email_templates=[
-            schemas.AdminEmailTemplate(
-                id=str(template.id),
-                org_id=str(template.org_id),
-                name=template.key or (template.subject or "Template"),
-                subject=template.subject,
-                body=template.body,
-                description="",
-                updated_at=template.created_at,
-            )
+            _email_template_to_schema(template)
             for template in templates
         ],
     )
@@ -563,6 +607,58 @@ def _empty_admin_overview(
         review_comments=[],
         email_templates=[],
     )
+
+
+@router.put("/email-templates/{template_key}", response_model=schemas.AdminEmailTemplate)
+async def upsert_email_template(
+    template_key: str,
+    payload: schemas.EmailTemplateUpsert,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(
+        require_roles("authenticated", "admin", "service_role")
+    ),
+) -> schemas.AdminEmailTemplate:
+    normalized_key = template_key.strip().lower()
+    metadata = _EMAIL_TEMPLATE_METADATA.get(normalized_key)
+    if metadata is None:
+        raise HTTPException(status_code=404, detail="Email template not recognized")
+
+    org, membership = await _resolve_org_for_email_templates(session, current_session)
+
+    if not current_session.user.has_role("service_role"):
+        if membership is None or membership.role not in ("owner", "admin"):
+            raise HTTPException(status_code=403, detail="Administrator privileges required")
+        if not membership.is_approved:
+            raise HTTPException(status_code=403, detail="Organization membership requires approval")
+
+    subject = (payload.subject or "").strip()
+    body = (payload.body or "").strip()
+    if not subject or not body:
+        raise HTTPException(status_code=400, detail="Subject and body are required")
+
+    result = await session.execute(
+        select(models.EmailTemplate)
+        .where(models.EmailTemplate.org_id == org.id)
+        .where(models.EmailTemplate.key == normalized_key)
+    )
+    template = result.scalar_one_or_none()
+
+    if template is None:
+        template = models.EmailTemplate(
+            org_id=org.id,
+            key=normalized_key,
+            subject=subject,
+            body=body,
+        )
+        session.add(template)
+    else:
+        template.subject = subject
+        template.body = body
+
+    await session.commit()
+    await session.refresh(template)
+
+    return _email_template_to_schema(template)
 
 
 @router.get("/overview", response_model=schemas.AdminOrgOverview)

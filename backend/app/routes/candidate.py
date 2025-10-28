@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,9 +13,17 @@ from sqlalchemy.orm import selectinload
 from .. import models, schemas
 from ..database import get_session
 from ..github_app import GitHubAppClient, GitHubAppError, get_github_app_client
+from ..services.email import (
+    EmailServiceError,
+    ResendEmailService,
+    get_resend_email_service,
+)
 from ..utils import hash_token
 
 router = APIRouter(prefix="/api", tags=["candidate"])
+
+
+logger = logging.getLogger(__name__)
 
 
 async def _get_invitation_by_token(
@@ -108,6 +117,7 @@ async def start_assessment(
     token: str,
     session: AsyncSession = Depends(get_session),
     github: GitHubAppClient = Depends(get_github_app_client),
+    email_service: ResendEmailService = Depends(get_resend_email_service),
 ) -> schemas.StartAssessmentResponse:
     invitation = await _get_invitation_by_token(session, token)
 
@@ -200,6 +210,23 @@ async def start_assessment(
     await session.refresh(candidate_repo)
     await session.refresh(access_token)
 
+    try:
+        sent_notification = await email_service.send_candidate_status_email(
+            session,
+            invitation=invitation,
+            assessment=assessment,
+            event_type=models.EmailEventType.assessment_started,
+            extra_context={
+                "candidate_repo_url": candidate_repo.repo_html_url or "",
+                "candidate_repo_name": candidate_repo.repo_full_name,
+            },
+        )
+    except EmailServiceError as exc:
+        logger.warning("Resend failed to send assessment started email: %s", exc)
+    else:
+        if sent_notification:
+            await session.commit()
+
     return schemas.StartAssessmentResponse(
         invitation_id=str(invitation.id),
         status=invitation.status.value,
@@ -217,8 +244,13 @@ async def submit_assessment(
     payload: schemas.SubmitRequest,
     session: AsyncSession = Depends(get_session),
     github: GitHubAppClient = Depends(get_github_app_client),
+    email_service: ResendEmailService = Depends(get_resend_email_service),
 ) -> schemas.SubmitResponse:
     invitation = await _get_invitation_by_token(session, token)
+
+    assessment = invitation.assessment
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
 
     if invitation.status != models.InvitationStatus.started:
         raise HTTPException(status_code=409, detail="Assessment is not in a started state")
@@ -254,6 +286,23 @@ async def submit_assessment(
 
     await session.commit()
     await session.refresh(submission)
+
+    try:
+        sent_notification = await email_service.send_candidate_status_email(
+            session,
+            invitation=invitation,
+            assessment=assessment,
+            event_type=models.EmailEventType.submission_received,
+            extra_context={
+                "candidate_repo_url": candidate_repo.repo_html_url if candidate_repo else "",
+                "candidate_repo_name": candidate_repo.repo_full_name if candidate_repo else "",
+            },
+        )
+    except EmailServiceError as exc:
+        logger.warning("Resend failed to send submission received email: %s", exc)
+    else:
+        if sent_notification:
+            await session.commit()
 
     return schemas.SubmitResponse(
         invitation_id=str(invitation.id),

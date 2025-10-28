@@ -49,6 +49,8 @@ class EmailEventType(enum.Enum):
     invite = "invite"
     reminder = "reminder"
     follow_up = "follow_up"
+    assessment_started = "assessment_started"
+    submission_received = "submission_received"
 
 
 class TimestampMixin:
