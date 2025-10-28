@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAdminData } from "../../../../../../providers/admin-data-provider";
-import { useSupabaseAuth } from "../../../../../../providers/supabase-provider";
-import { createAssessment, createSeed } from "../../../../../../lib/api";
-import { Button } from "../../../../../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../components/ui/card";
-import { Input } from "../../../../../../components/ui/input";
-import { Label } from "../../../../../../components/ui/label";
-import { Textarea } from "../../../../../../components/ui/textarea";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
+import { createAssessment, createSeed } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function NewAssessmentPage() {
   const router = useRouter();

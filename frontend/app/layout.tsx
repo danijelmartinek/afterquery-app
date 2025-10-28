@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ReactQueryClientProvider } from "../providers/react-query-provider";
-import { SupabaseProvider } from "../providers/supabase-provider";
+import { ReactQueryClientProvider } from "@/providers/react-query-provider";
+import { SupabaseProvider } from "@/providers/supabase-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 

@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { Plus } from "lucide-react";
-import { useAdminData } from "../../../../../providers/admin-data-provider";
-import { Button } from "../../../../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../../components/ui/table";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function AssessmentListPage() {
   const { state } = useAdminData();

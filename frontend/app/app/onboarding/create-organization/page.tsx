@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AdminAuthGate } from "../../../../components/auth/admin-auth-gate";
-import { Button } from "../../../../components/ui/button";
-import { useSupabaseAuth } from "../../../../providers/supabase-provider";
-import { createOrganization, fetchAdminOverview } from "../../../../lib/api";
+import { AdminAuthGate } from "@/components/auth/admin-auth-gate";
+import { Button } from "@/components/ui/button";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
+import { createOrganization, fetchAdminOverview } from "@/lib/api";
 
 export default function CreateOrganizationPage() {
   const router = useRouter();

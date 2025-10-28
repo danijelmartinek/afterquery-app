@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 
 const Table = ({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) => (
   <table className={cn("w-full border-collapse text-left text-sm", className)} {...props} />

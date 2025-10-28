@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 
 export default function LandingPage() {
   return (
@@ -17,9 +17,6 @@ export default function LandingPage() {
       <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
         <Button asChild>
           <Link href="/app/login">Sign in as admin</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/candidates/sample-invite">Preview candidate start page</Link>
         </Button>
       </div>
     </div>

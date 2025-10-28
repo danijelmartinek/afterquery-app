@@ -1,11 +1,11 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { useAdminData } from "@/providers/admin-data-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/ui/markdown";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
@@ -96,8 +96,10 @@ export default function AssessmentDetailPage() {
             <CardTitle className="text-base">Candidate instructions</CardTitle>
             <CardDescription>Rendered Markdown shown on the candidate start page.</CardDescription>
           </CardHeader>
-          <CardContent className="prose prose-zinc max-w-none">
-            <ReactMarkdown>{assessment.instructions ?? ""}</ReactMarkdown>
+          <CardContent>
+            <Markdown className="prose prose-zinc max-w-none">
+              {assessment.instructions ?? ""}
+            </Markdown>
           </CardContent>
         </Card>
         <Card>

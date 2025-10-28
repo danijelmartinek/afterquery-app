@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useAdminData } from "../../../../../providers/admin-data-provider";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
-import { Button } from "../../../../../components/ui/button";
-import { Badge } from "../../../../../components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../../components/ui/tabs";
-import { Textarea } from "../../../../../components/ui/textarea";
-import { markInvitationSubmitted } from "../../../../../lib/api";
-import { useSupabaseAuth } from "../../../../../providers/supabase-provider";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { markInvitationSubmitted } from "@/lib/api";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
 
 export default function ReviewWorkspacePage() {
   const params = useParams<{ invitationId: string }>();

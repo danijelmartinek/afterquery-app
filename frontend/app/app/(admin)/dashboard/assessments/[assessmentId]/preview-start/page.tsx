@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { useAdminData } from "@/providers/admin-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { buildCandidateStartLink, candidateBaseFromEnv } from "@/lib/invite-links";
+import { Markdown } from "@/components/ui/markdown";
 
 export default function PreviewStartPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -101,9 +101,9 @@ export default function PreviewStartPage() {
               </div>
               <Badge>Complete in {assessment.timeToCompleteHours}h</Badge>
             </div>
-            <div className="prose prose-sm prose-zinc mt-4 max-w-none">
-              <ReactMarkdown>{assessment.instructions}</ReactMarkdown>
-            </div>
+            <Markdown className="prose prose-sm prose-zinc mt-4 max-w-none">
+              {assessment.instructions}
+            </Markdown>
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline">Send test email</Button>

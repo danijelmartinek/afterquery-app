@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { cn } from "../../lib/utils";
-import { Button } from "../ui/button";
-import { useAdminData } from "../../providers/admin-data-provider";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAdminData } from "@/providers/admin-data-provider";
 import { FileCode2, LayoutDashboard, Layers, LogOut, Mail } from "lucide-react";
-import { useSupabaseAuth } from "../../providers/supabase-provider";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
 
 const NAV_LINKS = [
   { href: "/app/dashboard", label: "Overview", icon: LayoutDashboard },
