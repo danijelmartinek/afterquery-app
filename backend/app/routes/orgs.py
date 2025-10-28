@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
-from ..services.supabase_users import ensure_org_membership, ensure_supabase_user
+from ..services.supabase_memberships import ensure_org_membership
 
 router = APIRouter(prefix="/api/orgs", tags=["orgs"])
 
@@ -30,8 +30,7 @@ async def create_org(
     session.add(org)
     await session.flush()
 
-    db_user = await ensure_supabase_user(session, current_session)
-    await ensure_org_membership(session, org.id, db_user, role="owner")
+    await ensure_org_membership(session, org.id, current_session, role="owner", approve=True)
 
     await session.commit()
     await session.refresh(org)

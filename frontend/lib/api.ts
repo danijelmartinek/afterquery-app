@@ -31,7 +31,17 @@ async function fetchJson<T>(path: string, options: ApiRequestOptions = {}): Prom
   return (await response.json()) as T;
 }
 
-export type AdminOverviewResponse<TAssessment, TInvitation, TSeed, TRepo, TComment, TTemplate, TUser, TOrg> = {
+export type AdminOverviewResponse<
+  TAssessment,
+  TInvitation,
+  TSeed,
+  TRepo,
+  TComment,
+  TTemplate,
+  TUser,
+  TOrg,
+  TMembership
+> = {
   assessments: TAssessment[];
   invitations: TInvitation[];
   seeds: TSeed[];
@@ -39,7 +49,8 @@ export type AdminOverviewResponse<TAssessment, TInvitation, TSeed, TRepo, TComme
   reviewComments: TComment[];
   emailTemplates: TTemplate[];
   currentAdmin: TUser | null;
-  org: TOrg;
+  org: TOrg | null;
+  membership: TMembership | null;
 };
 
 export async function fetchAdminOverview<
@@ -50,10 +61,21 @@ export async function fetchAdminOverview<
   TComment,
   TTemplate,
   TUser,
-  TOrg
+  TOrg,
+  TMembership
 >(options: ApiRequestOptions = {}) {
   return fetchJson<
-    AdminOverviewResponse<TAssessment, TInvitation, TSeed, TRepo, TComment, TTemplate, TUser, TOrg>
+    AdminOverviewResponse<
+      TAssessment,
+      TInvitation,
+      TSeed,
+      TRepo,
+      TComment,
+      TTemplate,
+      TUser,
+      TOrg,
+      TMembership
+    >
   >("/api/admin/demo-overview", { cache: "no-store", ...options });
 }
 

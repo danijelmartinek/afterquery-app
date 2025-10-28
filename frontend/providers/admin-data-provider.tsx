@@ -19,6 +19,7 @@ import type {
   Seed,
   AdminUser,
   OrgProfile,
+  AdminMembership,
 } from "../lib/types";
 import { useSupabaseAuth } from "./supabase-provider";
 
@@ -42,12 +43,17 @@ type AdminDataAction =
       payload: { invitationId: string; status: Invitation["status"]; submittedAt?: string };
     };
 
+type WorkspaceStatus = "loading" | "needs_org" | "pending_approval" | "ready";
+
 const AdminDataContext = createContext<
   | ({
       state: AdminDataState;
       dispatch: React.Dispatch<AdminDataAction>;
       currentAdmin: AdminUser;
-      org: OrgProfile;
+      org: OrgProfile | null;
+      membership: AdminMembership | null;
+      workspaceStatus: WorkspaceStatus;
+      loading: boolean;
     })
   | undefined
 >(undefined);
@@ -103,6 +109,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
   const [org, setOrg] = useState<OrgProfile | null>(null);
+  const [membership, setMembership] = useState<AdminMembership | null>(null);
+  const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("loading");
+  const [loadingState, setLoadingState] = useState<boolean>(true);
 
   const { accessToken, loading: authLoading, user: supabaseUser, isConfigured } = useSupabaseAuth();
 
@@ -133,6 +142,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "initialize", payload: createEmptyState() });
       setCurrentAdmin(supabaseAdmin);
       setOrg(null);
+      setMembership(null);
+      setWorkspaceStatus("loading");
+      setLoadingState(false);
       return;
     }
 
@@ -140,11 +152,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "initialize", payload: createEmptyState() });
       setCurrentAdmin(supabaseAdmin);
       setOrg(null);
+      setMembership(null);
+      setWorkspaceStatus("loading");
+      setLoadingState(false);
       return;
     }
 
     let active = true;
     const controller = new AbortController();
+    setLoadingState(true);
 
     fetchAdminOverview<
       Assessment,
@@ -154,7 +170,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ReviewComment,
       EmailTemplate,
       AdminUser,
-      OrgProfile
+      OrgProfile,
+      AdminMembership
     >({ accessToken, signal: controller.signal })
       .then((data) => {
         if (!active) return;
@@ -170,13 +187,25 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           },
         });
         setCurrentAdmin(data.currentAdmin ?? supabaseAdmin ?? null);
-        setOrg(data.org);
+        setOrg(data.org ?? null);
+        setMembership(data.membership ?? null);
+        const status: WorkspaceStatus = !data.org
+          ? "needs_org"
+          : data.membership && !data.membership.isApproved
+          ? "pending_approval"
+          : "ready";
+        setWorkspaceStatus(status);
+        setLoadingState(false);
       })
       .catch((error) => {
         if (!active) return;
         console.error("Failed to load admin overview", error);
+        dispatch({ type: "initialize", payload: createEmptyState() });
         setCurrentAdmin(supabaseAdmin ?? null);
         setOrg(null);
+        setMembership(null);
+        setWorkspaceStatus("needs_org");
+        setLoadingState(false);
       });
 
     return () => {
@@ -193,12 +222,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       email: "demo@example.com",
       role: "authenticated",
     };
-  const fallbackOrg: OrgProfile =
-    org ?? { id: "demo-org", name: "Demo Organization", slug: "demo-organization" };
 
   const value = useMemo(
-    () => ({ state, dispatch, currentAdmin: fallbackAdmin, org: fallbackOrg }),
-    [state, fallbackAdmin, fallbackOrg],
+    () => ({
+      state,
+      dispatch,
+      currentAdmin: fallbackAdmin,
+      org,
+      membership,
+      workspaceStatus,
+      loading: loadingState,
+    }),
+    [state, fallbackAdmin, org, membership, workspaceStatus, loadingState],
   );
 
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>;

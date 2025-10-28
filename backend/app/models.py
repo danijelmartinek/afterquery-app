@@ -69,36 +69,23 @@ class Org(Base, TimestampMixin):
     seeds: Mapped[list["Seed"]] = relationship(back_populates="org")
     email_templates: Mapped[list["EmailTemplate"]] = relationship(back_populates="org")
 
-
-class User(Base, TimestampMixin):
-    __tablename__ = "users"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
-    memberships: Mapped[list["OrgMember"]] = relationship(back_populates="user")
-
-
 class OrgMember(Base, TimestampMixin):
     __tablename__ = "org_members"
     __table_args__ = (
-        UniqueConstraint("org_id", "user_id", name="uq_org_member"),
+        UniqueConstraint("org_id", "supabase_user_id", name="uq_org_member"),
         CheckConstraint("role IN ('owner','admin','viewer')", name="ck_org_member_role"),
     )
 
     org_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), primary_key=True
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    supabase_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     role: Mapped[str] = mapped_column(String, nullable=False)
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     org: Mapped[Org] = relationship(back_populates="members")
-    user: Mapped[User] = relationship(back_populates="memberships")
 
 
 class Seed(Base, TimestampMixin):
@@ -141,9 +128,7 @@ class Assessment(Base, TimestampMixin):
     candidate_email_body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     time_to_start: Mapped[timedelta] = mapped_column(Interval, nullable=False)
     time_to_complete: Mapped[timedelta] = mapped_column(Interval, nullable=False)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
-    )
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     org: Mapped[Org] = relationship()
     seed: Mapped[Seed] = relationship(back_populates="assessments")

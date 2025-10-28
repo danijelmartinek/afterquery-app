@@ -17,16 +17,12 @@ from sqlalchemy.orm import selectinload
 from .. import models, schemas, utils
 from ..auth import SupabaseSession, require_roles
 from ..database import ASYNC_ENGINE, get_session
-from ..services.supabase_users import ensure_supabase_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_PATH = _REPO_ROOT / "db" / "schema.sql"
 _DEMO_DATA_PATH = _REPO_ROOT / "db" / "demo_seed_data.json"
-
-_ROLE_PRIORITY = {"owner": 0, "admin": 1, "viewer": 2}
-
 
 def _normalize_email(value: Optional[str]) -> Optional[str]:
     if value is None:
@@ -42,10 +38,66 @@ def _find_membership_for_email(
     if not normalized_email:
         return None
     for membership in org.members:
-        if membership.user and membership.user.email:
-            member_email = _normalize_email(membership.user.email)
+        if membership.email:
+            member_email = _normalize_email(membership.email)
             if member_email == normalized_email:
                 return membership
+    return None
+
+
+def _derive_supabase_display_name(session: Optional[SupabaseSession]) -> Optional[str]:
+    if session is None:
+        return None
+    metadata = session.user.user_metadata if session.user.user_metadata else {}
+    if isinstance(metadata, dict):
+        for key in ("full_name", "name"):
+            value = metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    if session.user.email:
+        return session.user.email
+    return None
+
+
+def _membership_to_schema(
+    membership: Optional[models.OrgMember],
+) -> Optional[schemas.AdminMembership]:
+    if membership is None:
+        return None
+    return schemas.AdminMembership(
+        org_id=str(membership.org_id),
+        supabase_user_id=str(membership.supabase_user_id),
+        role=membership.role,
+        is_approved=membership.is_approved,
+    )
+
+
+def _build_admin_user(
+    membership: Optional[models.OrgMember],
+    supabase_session: Optional[SupabaseSession],
+) -> Optional[schemas.AdminUser]:
+    if membership is not None:
+        name = (
+            membership.display_name
+            or membership.email
+            or str(membership.supabase_user_id)
+        )
+        return schemas.AdminUser(
+            id=str(membership.supabase_user_id),
+            email=membership.email,
+            name=name,
+            role=membership.role,
+        )
+
+    if supabase_session is not None:
+        derived_name = _derive_supabase_display_name(supabase_session)
+        return schemas.AdminUser(
+            id=str(supabase_session.user.id),
+            email=supabase_session.user.email,
+            name=derived_name,
+            role=supabase_session.user.role,
+        )
+
     return None
 
 
@@ -89,7 +141,7 @@ def _load_demo_data() -> dict:
 
 
 async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
-    """Seed a minimal organization, user, and assessment if absent."""
+    """Seed a minimal organization, membership, and assessment if absent."""
 
     demo_data = _load_demo_data()
 
@@ -106,6 +158,19 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
 
     demo_user_email = (owner_config or {}).get("email", "founder@example.com")
     demo_user_name = (owner_config or {}).get("name", "Demo Founder")
+    owner_supabase_id_raw = (owner_config or {}).get("supabase_user_id")
+    owner_is_approved = bool((owner_config or {}).get("is_approved", True))
+
+    owner_supabase_id: uuid.UUID
+    if owner_supabase_id_raw:
+        try:
+            owner_supabase_id = uuid.UUID(owner_supabase_id_raw)
+        except ValueError:
+            owner_supabase_id = uuid.uuid5(uuid.NAMESPACE_DNS, owner_supabase_id_raw)
+    else:
+        # Generate a stable UUID based on the email for demo purposes.
+        seed_value = demo_user_email or "demo-owner@example.com"
+        owner_supabase_id = uuid.uuid5(uuid.NAMESPACE_DNS, seed_value)
 
     demo_seed_repo = seed_config.get("seed_repo_full_name", "example/fullstack-seed")
     demo_source_repo = seed_config.get("source_repo_url", "https://github.com/example/fullstack-seed")
@@ -133,7 +198,6 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
     demo_candidate_name = invitation_config.get("candidate_name", "Demo Candidate")
 
     created_org = False
-    created_user = False
     created_membership = False
     created_seed = False
     created_assessment = False
@@ -148,24 +212,40 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
         await session.flush()
         created_org = True
 
-    user_result = await session.execute(select(models.User).where(models.User.email == demo_user_email))
-    user = user_result.scalar_one_or_none()
-    if user is None:
-        user = models.User(email=demo_user_email, name=demo_user_name)
-        session.add(user)
-        await session.flush()
-        created_user = True
-
     membership_result = await session.execute(
         select(models.OrgMember).where(
-            models.OrgMember.org_id == org.id, models.OrgMember.user_id == user.id
+            models.OrgMember.org_id == org.id,
+            models.OrgMember.supabase_user_id == owner_supabase_id,
         )
     )
     membership = membership_result.scalar_one_or_none()
     if membership is None:
-        membership = models.OrgMember(org_id=org.id, user_id=user.id, role="owner")
+        membership = models.OrgMember(
+            org_id=org.id,
+            supabase_user_id=owner_supabase_id,
+            email=demo_user_email,
+            display_name=demo_user_name,
+            role="owner",
+            is_approved=owner_is_approved,
+        )
         session.add(membership)
         created_membership = True
+    else:
+        updated = False
+        if membership.role != "owner":
+            membership.role = "owner"
+            updated = True
+        if membership.email != demo_user_email:
+            membership.email = demo_user_email
+            updated = True
+        if membership.display_name != demo_user_name:
+            membership.display_name = demo_user_name
+            updated = True
+        if membership.is_approved != owner_is_approved:
+            membership.is_approved = owner_is_approved
+            updated = True
+        if updated:
+            session.add(membership)
 
     seed_result = await session.execute(
         select(models.Seed).where(
@@ -241,9 +321,10 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
     return schemas.SeedSummary(
         created_org=created_org,
         org_id=str(org.id),
-        created_user=created_user,
-        user_id=str(user.id),
-        created_membership=created_membership,
+        created_owner_membership=created_membership,
+        owner_supabase_user_id=str(owner_supabase_id),
+        owner_email=demo_user_email,
+        owner_is_approved=owner_is_approved,
         created_seed=created_seed,
         seed_id=str(seed.id),
         created_assessment=created_assessment,
@@ -287,7 +368,7 @@ async def _fetch_org(
     query = (
         select(models.Org)
         .options(
-            selectinload(models.Org.members).selectinload(models.OrgMember.user),
+            selectinload(models.Org.members),
             selectinload(models.Org.seeds),
         )
         .order_by(models.Org.created_at)
@@ -307,7 +388,10 @@ async def _fetch_org(
 
 
 async def _build_admin_overview(
-    session: AsyncSession, org: models.Org, supabase_session: Optional[SupabaseSession] = None
+    session: AsyncSession,
+    org: models.Org,
+    membership: Optional[models.OrgMember],
+    supabase_session: Optional[SupabaseSession] = None,
 ) -> schemas.AdminOrgOverview:
     assessments_result = await session.execute(
         select(models.Assessment)
@@ -344,14 +428,9 @@ async def _build_admin_overview(
     else:
         review_comments = []
 
-    author_ids = {comment.created_by for comment in review_comments if comment.created_by}
-    if author_ids:
-        users_result = await session.execute(
-            select(models.User).where(models.User.id.in_(author_ids))
-        )
-        user_map = {user.id: user for user in users_result.scalars()}
-    else:
-        user_map = {}
+    membership_map = {
+        member.supabase_user_id: member for member in org.members
+    }
 
     templates_result = await session.execute(
         select(models.EmailTemplate)
@@ -360,50 +439,15 @@ async def _build_admin_overview(
     )
     templates = templates_result.scalars().all()
 
-    memberships = sorted(
-        org.members,
-        key=lambda member: (_ROLE_PRIORITY.get(member.role, 99), member.created_at),
-    )
-    current_admin: Optional[schemas.AdminUser] = None
-    chosen_membership: Optional[models.OrgMember] = None
-    db_user = None
-    if supabase_session is not None:
-        db_user = await ensure_supabase_user(session, supabase_session)
-        chosen_membership = next(
-            (
-                membership
-                for membership in org.members
-                if membership.user_id == db_user.id
-            ),
-            None,
-        )
-        if chosen_membership is None:
-            chosen_membership = _find_membership_for_email(org, supabase_session.user.email)
-    if chosen_membership is None and memberships:
-        chosen_membership = memberships[0]
-
-    if chosen_membership and chosen_membership.user is not None:
-        user = chosen_membership.user
-        current_admin = schemas.AdminUser(
-            id=str(user.id),
-            email=user.email,
-            name=user.name or user.email,
-            role=chosen_membership.role,
-        )
-    elif db_user is not None:
-        derived_name = db_user.name or db_user.email or str(db_user.id)
-        current_admin = schemas.AdminUser(
-            id=str(db_user.id),
-            email=db_user.email,
-            name=derived_name,
-            role=supabase_session.user.role if supabase_session else None,
-        )
-
     seeds = sorted(org.seeds, key=lambda seed: seed.created_at, reverse=True)
+
+    current_admin = _build_admin_user(membership, supabase_session)
+    membership_schema = _membership_to_schema(membership)
 
     return schemas.AdminOrgOverview(
         org=schemas.AdminOrg(id=str(org.id), name=org.name, slug=_slugify(org.name)),
         current_admin=current_admin,
+        membership=membership_schema,
         seeds=[
             schemas.AdminSeed(
                 id=str(seed.id),
@@ -466,11 +510,12 @@ async def _build_admin_overview(
                 id=str(comment.id),
                 invitation_id=str(comment.invitation_id),
                 author=(
-                    user_map[comment.created_by].name
-                    if comment.created_by in user_map and user_map[comment.created_by].name
+                    membership_map[comment.created_by].display_name
+                    if comment.created_by in membership_map
+                    and membership_map[comment.created_by].display_name
                     else (
-                        user_map[comment.created_by].email
-                        if comment.created_by in user_map
+                        membership_map[comment.created_by].email
+                        if comment.created_by in membership_map
                         else None
                     )
                 ),
@@ -494,6 +539,30 @@ async def _build_admin_overview(
     )
 
 
+def _empty_admin_overview(
+    org: Optional[models.Org],
+    membership: Optional[models.OrgMember],
+    supabase_session: Optional[SupabaseSession],
+) -> schemas.AdminOrgOverview:
+    org_schema = (
+        schemas.AdminOrg(id=str(org.id), name=org.name, slug=_slugify(org.name))
+        if org is not None
+        else None
+    )
+
+    return schemas.AdminOrgOverview(
+        org=org_schema,
+        current_admin=_build_admin_user(membership, supabase_session),
+        membership=_membership_to_schema(membership),
+        seeds=[],
+        assessments=[],
+        invitations=[],
+        candidate_repos=[],
+        review_comments=[],
+        email_templates=[],
+    )
+
+
 @router.get("/demo-overview", response_model=schemas.AdminOrgOverview)
 async def get_demo_overview(
     session: AsyncSession = Depends(get_session),
@@ -504,12 +573,28 @@ async def get_demo_overview(
     """Return a consolidated snapshot of the first organization for demos."""
 
     org = await _fetch_org(session)
-    if not current_session.user.has_role("service_role"):
-        membership = _find_membership_for_email(org, current_session.user.email)
-        if membership is None and org.members:
-            raise HTTPException(
-                status_code=403,
-                detail="You are not a member of this organization",
-            )
 
-    return await _build_admin_overview(session, org, current_session)
+    membership = next(
+        (
+            member
+            for member in org.members
+            if member.supabase_user_id == current_session.user.id
+        ),
+        None,
+    )
+    if membership is None:
+        membership = _find_membership_for_email(org, current_session.user.email)
+
+    is_service_role = current_session.user.has_role("service_role")
+
+    if membership is None and not is_service_role:
+        return _empty_admin_overview(None, None, current_session)
+
+    if (
+        membership is not None
+        and not membership.is_approved
+        and not is_service_role
+    ):
+        return _empty_admin_overview(org, membership, current_session)
+
+    return await _build_admin_overview(session, org, membership, current_session)

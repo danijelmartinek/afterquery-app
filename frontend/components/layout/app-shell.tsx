@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { useAdminData } from "../../providers/admin-data-provider";
@@ -18,10 +18,21 @@ const NAV_LINKS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentAdmin, org } = useAdminData();
+  const { currentAdmin, org, workspaceStatus, loading } = useAdminData();
   const router = useRouter();
   const { signOut, user: supabaseUser } = useSupabaseAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    if (workspaceStatus === "needs_org") {
+      router.replace("/app/onboarding");
+    } else if (workspaceStatus === "pending_approval") {
+      router.replace("/app/forbidden");
+    }
+  }, [workspaceStatus, loading, router]);
 
   const displayName = useMemo(() => {
     if (currentAdmin.name && currentAdmin.name.trim().length > 0) {
@@ -48,6 +59,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.replace("/app/login");
     }
   };
+
+  if (loading || workspaceStatus === "needs_org" || workspaceStatus === "pending_approval") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+        <p className="text-sm text-zinc-500">Loading your admin workspace...</p>
+      </div>
+    );
+  }
+
+  if (!org) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen bg-zinc-50">

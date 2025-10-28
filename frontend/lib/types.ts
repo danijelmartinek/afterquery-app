@@ -68,6 +68,13 @@ export type AdminUser = {
   role: string | null;
 };
 
+export type AdminMembership = {
+  orgId: string;
+  supabaseUserId: string;
+  role: string;
+  isApproved: boolean;
+};
+
 export type OrgProfile = {
   id: string;
   name: string;

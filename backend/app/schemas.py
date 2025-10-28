@@ -28,9 +28,10 @@ class CamelModel(BaseModel):
 class SeedSummary(BaseModel):
     created_org: bool
     org_id: str
-    created_user: bool
-    user_id: str
-    created_membership: bool
+    created_owner_membership: bool
+    owner_supabase_user_id: Optional[str]
+    owner_email: Optional[str]
+    owner_is_approved: bool
     created_seed: bool
     seed_id: str
     created_assessment: bool
@@ -179,6 +180,13 @@ class AdminOrg(CamelModel):
     slug: str
 
 
+class AdminMembership(CamelModel):
+    org_id: str
+    supabase_user_id: str
+    role: str
+    is_approved: bool
+
+
 class AdminSeed(CamelModel):
     id: str
     source_repo_url: str
@@ -245,8 +253,9 @@ class AdminEmailTemplate(CamelModel):
 
 
 class AdminOrgOverview(CamelModel):
-    org: AdminOrg
+    org: Optional[AdminOrg]
     current_admin: Optional[AdminUser]
+    membership: Optional[AdminMembership]
     seeds: List[AdminSeed]
     assessments: List[AdminAssessment]
     invitations: List[AdminInvitation]

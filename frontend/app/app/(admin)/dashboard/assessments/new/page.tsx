@@ -51,6 +51,10 @@ export default function NewAssessmentPage() {
     }
   }, [state.seeds.length]);
 
+  if (!org) {
+    return null;
+  }
+
   const hasSeeds = state.seeds.length > 0;
 
   async function handleCreateSeed() {

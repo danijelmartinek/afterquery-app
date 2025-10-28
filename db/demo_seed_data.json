@@ -5,7 +5,9 @@
       {
         "email": "founder@example.com",
         "name": "Demo Founder",
-        "role": "owner"
+        "role": "owner",
+        "supabase_user_id": "3a37fb84-2b2b-4b16-8e48-98df037b7beb",
+        "is_approved": true
       }
     ]
   },

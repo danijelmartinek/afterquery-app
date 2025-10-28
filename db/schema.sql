@@ -11,20 +11,17 @@ CREATE TABLE IF NOT EXISTS orgs (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email text UNIQUE NOT NULL,
-  name text,
-  created_at timestamptz DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS org_members (
   org_id uuid REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+  supabase_user_id uuid NOT NULL,
+  email text,
+  display_name text,
   role text CHECK (role IN ('owner','admin','viewer')) NOT NULL,
+  is_approved boolean NOT NULL DEFAULT false,
   created_at timestamptz DEFAULT now(),
-  PRIMARY KEY (org_id, user_id)
+  PRIMARY KEY (org_id, supabase_user_id)
 );
+CREATE INDEX IF NOT EXISTS idx_org_members_supabase_user ON org_members(supabase_user_id);
 
 -- Seeds
 CREATE TABLE IF NOT EXISTS seeds (
@@ -51,7 +48,7 @@ CREATE TABLE IF NOT EXISTS assessments (
   candidate_email_body text,
   time_to_start interval NOT NULL,
   time_to_complete interval NOT NULL,
-  created_by uuid REFERENCES users(id),
+  created_by uuid,
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_assessments_org_id ON assessments(org_id);
@@ -118,7 +115,7 @@ CREATE TABLE IF NOT EXISTS review_comments (
   path text,
   line integer,
   body text NOT NULL,
-  created_by uuid REFERENCES users(id),
+  created_by uuid,
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_review_comments_invitation_id ON review_comments(invitation_id);
@@ -129,7 +126,7 @@ CREATE TABLE IF NOT EXISTS review_feedback (
   invitation_id uuid REFERENCES invitations(id) ON DELETE CASCADE,
   summary text,
   rating int CHECK (rating BETWEEN 1 AND 5),
-  created_by uuid REFERENCES users(id),
+  created_by uuid,
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_review_feedback_invitation_id ON review_feedback(invitation_id);

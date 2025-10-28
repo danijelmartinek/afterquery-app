@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
-from ..services.supabase_users import ensure_supabase_user
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 
@@ -39,8 +38,6 @@ async def create_assessment(
     if seed is None:
         raise HTTPException(status_code=404, detail="Seed not found for this organization")
 
-    db_user = await ensure_supabase_user(session, current_session)
-
     assessment = models.Assessment(
         org_id=org_id,
         seed_id=seed_id,
@@ -51,7 +48,11 @@ async def create_assessment(
         candidate_email_body=payload.candidate_email_body,
         time_to_start=payload.time_to_start,
         time_to_complete=payload.time_to_complete,
-        created_by=(uuid.UUID(payload.created_by) if payload.created_by else db_user.id),
+        created_by=(
+            uuid.UUID(payload.created_by)
+            if payload.created_by
+            else current_session.user.id
+        ),
     )
     session.add(assessment)
     await session.commit()
