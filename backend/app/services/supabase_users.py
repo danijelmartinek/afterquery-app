@@ -40,13 +40,13 @@ async def ensure_supabase_user(
     user = await db.get(models.User, supabase_user_id)
 
     if user is None and supabase_email:
-        # Existing demo data may have created the user with a generated id.
+        # Existing demo data may have created the user with a generated id. Reuse that
+        # record instead of rewriting the primary key, since other tables may already
+        # reference it.
         result = await db.execute(
             select(models.User).where(models.User.email == supabase_email)
         )
         user = result.scalar_one_or_none()
-        if user is not None and user.id != supabase_user_id:
-            user.id = supabase_user_id
 
     if user is None:
         # Fallback email ensures the record satisfies the non-null constraint.
