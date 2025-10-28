@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAdminData } from "../../../../../../../providers/admin-data-provider";
 import { useSupabaseAuth } from "../../../../../../../providers/supabase-provider";
 import { createInvitations } from "../../../../../../../lib/api";
@@ -24,12 +24,20 @@ export default function AssessmentInvitesPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [origin, setOrigin] = useState<string | null>(null);
+  const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
 
   if (!assessment) {
     return <p className="text-sm text-zinc-500">Assessment not found.</p>;
   }
 
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
 
   async function handleCreateInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,6 +68,39 @@ export default function AssessmentInvitesPage() {
       setError(message);
     } finally {
       setIsSending(false);
+    }
+  }
+
+  function scheduleReset(inviteId: string) {
+    setTimeout(() => {
+      setCopyStates((prev) => {
+        if (!(inviteId in prev)) {
+          return prev;
+        }
+        const { [inviteId]: _, ...rest } = prev;
+        return rest;
+      });
+    }, 2000);
+  }
+
+  async function handleCopyInvite(inviteId: string, startLinkToken?: string | null) {
+    if (!origin || !startLinkToken) {
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
+      scheduleReset(inviteId);
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(`${origin}/candidates/${startLinkToken}`);
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "copied" }));
+      scheduleReset(inviteId);
+    } catch (copyError) {
+      console.error("Failed to copy invite link", copyError);
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
+      scheduleReset(inviteId);
     }
   }
 
@@ -124,6 +165,7 @@ export default function AssessmentInvitesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Start deadline</TableHead>
                 <TableHead>Complete deadline</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -140,11 +182,25 @@ export default function AssessmentInvitesPage() {
                   <TableCell>
                     {invite.completeDeadline ? new Date(invite.completeDeadline).toLocaleString() : "—"}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
+                      disabled={!invite.startLinkToken || !origin}
+                    >
+                      {copyStates[invite.id] === "copied"
+                        ? "Copied!"
+                        : copyStates[invite.id] === "error"
+                          ? "Copy failed"
+                          : "Copy invite link"}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {invites.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-zinc-500">
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-zinc-500">
                     No invites yet.
                   </TableCell>
                 </TableRow>
