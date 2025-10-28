@@ -26,6 +26,9 @@ if _DOTENV_PATH:
 
 _DATABASE_URL_ENV = "DATABASE_URL"
 
+print(f"✅ Loaded .env from: {_DOTENV_PATH}")
+print(f"📦 DATABASE_URL = {os.getenv('DATABASE_URL')}")
+
 
 def _build_async_database_url(raw_url: str) -> str:
     """Ensure the database URL uses the asyncpg driver."""

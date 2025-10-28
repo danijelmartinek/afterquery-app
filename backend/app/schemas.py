@@ -53,7 +53,7 @@ class OrgRead(OrgCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SeedCreate(BaseModel):
@@ -70,7 +70,7 @@ class SeedRead(SeedCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AssessmentCreate(BaseModel):
@@ -91,7 +91,7 @@ class AssessmentRead(AssessmentCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class InvitationCreate(BaseModel):
@@ -116,7 +116,7 @@ class InvitationRead(BaseModel):
     sent_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CandidateRepoRead(BaseModel):
@@ -131,7 +131,7 @@ class CandidateRepoRead(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class StartAssessmentResponse(BaseModel):
@@ -167,7 +167,7 @@ class InvitationDetail(BaseModel):
     expired_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AdminUser(CamelModel):
