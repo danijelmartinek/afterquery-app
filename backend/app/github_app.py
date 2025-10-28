@@ -520,7 +520,7 @@ class GitHubAppClient:
 
     async def fetch_installation(self, installation_id: Optional[int] = None) -> dict[str, Any]:
         target_id = installation_id if installation_id is not None else self.installation_id
-        app_jwt = await self._get_app_jwt()
+        app_jwt = self._ensure_app_jwt()
         async with httpx.AsyncClient(
             base_url=self._settings.api_base_url,
             timeout=self._settings.request_timeout_seconds,
