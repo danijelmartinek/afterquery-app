@@ -1,11 +1,11 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Markdown } from "@/components/ui/markdown";
 import {
   startCandidateAssessment,
   submitCandidateAssessment,
@@ -291,8 +291,10 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
               Follow these steps carefully. We’ll discuss trade-offs during your review conversation.
             </CardDescription>
           </CardHeader>
-          <CardContent className="prose prose-zinc max-w-none">
-            <ReactMarkdown>{assessment.instructions ?? ""}</ReactMarkdown>
+          <CardContent>
+            <Markdown className="prose prose-zinc max-w-none">
+              {assessment.instructions ?? ""}
+            </Markdown>
           </CardContent>
         </Card>
 
