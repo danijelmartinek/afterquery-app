@@ -49,7 +49,7 @@ const AdminDataContext = createContext<
   | ({
       state: AdminDataState;
       dispatch: React.Dispatch<AdminDataAction>;
-      currentAdmin: AdminUser;
+      currentAdmin: AdminUser | null;
       org: OrgProfile | null;
       membership: AdminMembership | null;
       workspaceStatus: WorkspaceStatus;
@@ -214,26 +214,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   }, [accessToken, authLoading, supabaseAdmin, isConfigured]);
 
-  const fallbackAdmin: AdminUser =
-    currentAdmin ??
-    supabaseAdmin ?? {
-      id: "demo-admin",
-      name: "Demo Admin",
-      email: "demo@example.com",
-      role: "authenticated",
-    };
-
   const value = useMemo(
     () => ({
       state,
       dispatch,
-      currentAdmin: fallbackAdmin,
+      currentAdmin,
       org,
       membership,
       workspaceStatus,
       loading: loadingState,
     }),
-    [state, fallbackAdmin, org, membership, workspaceStatus, loadingState],
+    [state, currentAdmin, org, membership, workspaceStatus, loadingState],
   );
 
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>;

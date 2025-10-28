@@ -11,13 +11,13 @@ export type Assessment = {
   orgId: string;
   seedId: string;
   title: string;
-  description: string;
-  instructions: string;
-  candidateEmailSubject: string;
-  candidateEmailBody: string;
+  description: string | null;
+  instructions: string | null;
+  candidateEmailSubject: string | null;
+  candidateEmailBody: string | null;
   timeToStartHours: number;
   timeToCompleteHours: number;
-  createdBy: string;
+  createdBy: string | null;
   createdAt: string;
 };
 
@@ -35,12 +35,12 @@ export type Invitation = {
   candidateEmail: string;
   candidateName: string;
   status: InvitationStatus;
-  startDeadline: string;
-  completeDeadline?: string;
+  startDeadline: string | null;
+  completeDeadline: string | null;
   startLinkToken?: string | null;
   sentAt: string;
-  startedAt?: string;
-  submittedAt?: string;
+  startedAt?: string | null;
+  submittedAt?: string | null;
 };
 
 export type CandidateRepo = {

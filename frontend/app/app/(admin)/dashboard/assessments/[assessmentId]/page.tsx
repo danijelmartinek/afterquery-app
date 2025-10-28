@@ -27,7 +27,9 @@ export default function AssessmentDetailPage() {
         <div>
           <p className="text-sm text-zinc-500">Seed: {seed?.seedRepo}</p>
           <h1 className="mt-1 text-2xl font-semibold text-zinc-900">{assessment.title}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-zinc-500">{assessment.description}</p>
+          <p className="mt-2 max-w-2xl text-sm text-zinc-500">
+            {assessment.description ?? "No description provided yet."}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => router.push(`/app/dashboard/assessments/${assessment.id}/preview-start`)}>
@@ -46,7 +48,7 @@ export default function AssessmentDetailPage() {
             <CardDescription>Rendered Markdown shown on the candidate start page.</CardDescription>
           </CardHeader>
           <CardContent className="prose prose-zinc max-w-none">
-            <ReactMarkdown>{assessment.instructions}</ReactMarkdown>
+            <ReactMarkdown>{assessment.instructions ?? ""}</ReactMarkdown>
           </CardContent>
         </Card>
         <Card>

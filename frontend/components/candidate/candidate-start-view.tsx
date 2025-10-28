@@ -38,7 +38,9 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
               <div>
                 <p className="text-xs uppercase tracking-wide text-zinc-400">Start by</p>
                 <p className="text-base font-semibold text-zinc-900">
-                  {new Date(invitation.startDeadline).toLocaleString()}
+                  {invitation.startDeadline
+                    ? new Date(invitation.startDeadline).toLocaleString()
+                    : "Schedule coming soon"}
                 </p>
               </div>
               <Badge>Complete within {assessment.timeToCompleteHours}h</Badge>
@@ -80,7 +82,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
             </CardDescription>
           </CardHeader>
           <CardContent className="prose prose-zinc max-w-none">
-            <ReactMarkdown>{assessment.instructions}</ReactMarkdown>
+            <ReactMarkdown>{assessment.instructions ?? ""}</ReactMarkdown>
           </CardContent>
         </Card>
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminData } from "../../../../../../providers/admin-data-provider";
 import { useSupabaseAuth } from "../../../../../../providers/supabase-provider";
-import { createSeed } from "../../../../../../lib/api";
+import { createAssessment, createSeed } from "../../../../../../lib/api";
 import { Button } from "../../../../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../components/ui/card";
 import { Input } from "../../../../../../components/ui/input";
@@ -14,7 +14,7 @@ import { Textarea } from "../../../../../../components/ui/textarea";
 export default function NewAssessmentPage() {
   const router = useRouter();
   const { state, dispatch, currentAdmin, org } = useAdminData();
-  const { accessToken } = useSupabaseAuth();
+  const { accessToken, user: supabaseUser } = useSupabaseAuth();
   const [formState, setFormState] = useState({
     title: "",
     description: "",
@@ -33,6 +33,8 @@ export default function NewAssessmentPage() {
   });
   const [seedError, setSeedError] = useState<string | null>(null);
   const [creatingSeed, setCreatingSeed] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setFormState((prev) => {
@@ -118,30 +120,45 @@ export default function NewAssessmentPage() {
     }
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!formState.title || !formState.seedId) return;
+    if (!formState.title || !formState.seedId) {
+      setFormError("Title and seed are required");
+      return;
+    }
 
-    const assessmentId = `assessment-${crypto.randomUUID()}`;
-    dispatch({
-      type: "createAssessment",
-      payload: {
-        id: assessmentId,
-        orgId: org.id,
-        seedId: formState.seedId,
-        title: formState.title,
-        description: formState.description,
-        instructions: formState.instructions,
-        candidateEmailSubject: formState.candidateEmailSubject,
-        candidateEmailBody: formState.candidateEmailBody,
-        timeToStartHours: Number(formState.timeToStartHours),
-        timeToCompleteHours: Number(formState.timeToCompleteHours),
-        createdBy: currentAdmin.id,
-        createdAt: new Date().toISOString(),
-      },
-    });
+    if (!accessToken) {
+      setFormError("Sign in to create assessments");
+      return;
+    }
 
-    router.push(`/app/dashboard/assessments/${assessmentId}`);
+    setFormError(null);
+    setIsSubmitting(true);
+    try {
+      const newAssessment = await createAssessment(
+        {
+          orgId: org.id,
+          seedId: formState.seedId,
+          title: formState.title,
+          description: formState.description,
+          instructions: formState.instructions,
+          candidateEmailSubject: formState.candidateEmailSubject,
+          candidateEmailBody: formState.candidateEmailBody,
+          timeToStartHours: Number(formState.timeToStartHours),
+          timeToCompleteHours: Number(formState.timeToCompleteHours),
+          createdBy: currentAdmin?.id ?? supabaseUser?.id ?? null,
+        },
+        { accessToken },
+      );
+
+      dispatch({ type: "createAssessment", payload: newAssessment });
+      router.push(`/app/dashboard/assessments/${newAssessment.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create assessment";
+      setFormError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -371,7 +388,10 @@ export default function NewAssessmentPage() {
         <Button variant="outline" type="button" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button type="submit">Save and continue</Button>
+        {formError ? <p className="flex-1 text-sm text-red-600">{formError}</p> : <span className="flex-1" />}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : "Save and continue"}
+        </Button>
       </div>
     </form>
   );

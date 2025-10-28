@@ -77,11 +77,11 @@ async function CandidateStartContent({ inviteToken }: { inviteToken: string }) {
       candidateName: invitationPayload.candidateName ?? invitationPayload.candidateEmail,
       status: invitationPayload.status,
       startDeadline: invitationPayload.startDeadline ?? invitationPayload.sentAt,
-      completeDeadline: invitationPayload.completeDeadline ?? undefined,
+      completeDeadline: invitationPayload.completeDeadline ?? null,
       startLinkToken: inviteToken,
       sentAt: invitationPayload.sentAt,
-      startedAt: invitationPayload.startedAt ?? undefined,
-      submittedAt: invitationPayload.submittedAt ?? undefined,
+      startedAt: invitationPayload.startedAt ?? null,
+      submittedAt: invitationPayload.submittedAt ?? null,
     };
 
     const nowIso = new Date().toISOString();
@@ -91,13 +91,13 @@ async function CandidateStartContent({ inviteToken }: { inviteToken: string }) {
       orgId: "",
       seedId: assessmentPayload.seedId,
       title: assessmentPayload.title,
-      description: assessmentPayload.description ?? "",
-      instructions: assessmentPayload.instructions ?? "",
-      candidateEmailSubject: assessmentPayload.candidateEmailSubject ?? "",
-      candidateEmailBody: assessmentPayload.candidateEmailBody ?? "",
+      description: assessmentPayload.description ?? null,
+      instructions: assessmentPayload.instructions ?? null,
+      candidateEmailSubject: assessmentPayload.candidateEmailSubject ?? null,
+      candidateEmailBody: assessmentPayload.candidateEmailBody ?? null,
       timeToStartHours: assessmentPayload.timeToStartHours,
       timeToCompleteHours: assessmentPayload.timeToCompleteHours,
-      createdBy: "",
+      createdBy: null,
       createdAt: nowIso,
     };
 

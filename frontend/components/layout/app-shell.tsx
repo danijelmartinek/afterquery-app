@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [workspaceStatus, loading, router]);
 
   const displayName = useMemo(() => {
-    if (currentAdmin.name && currentAdmin.name.trim().length > 0) {
+    if (currentAdmin?.name && currentAdmin.name.trim().length > 0) {
       return currentAdmin.name;
     }
     const metadata = supabaseUser?.user_metadata ?? {};
@@ -45,7 +45,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (typeof metadata.name === "string" && metadata.name.trim()) {
       return metadata.name.trim();
     }
-    return currentAdmin.email ?? supabaseUser?.email ?? "Admin";
+    if (currentAdmin?.email) {
+      return currentAdmin.email;
+    }
+    if (supabaseUser?.email) {
+      return supabaseUser.email;
+    }
+    return "Admin";
   }, [currentAdmin, supabaseUser]);
 
   const handleSignOut = async () => {

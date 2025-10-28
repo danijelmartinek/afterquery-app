@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -563,26 +563,46 @@ def _empty_admin_overview(
     )
 
 
-@router.get("/demo-overview", response_model=schemas.AdminOrgOverview)
-async def get_demo_overview(
+@router.get("/overview", response_model=schemas.AdminOrgOverview)
+async def get_admin_overview(
+    org_id: Optional[str] = Query(default=None, alias="orgId"),
     session: AsyncSession = Depends(get_session),
     current_session: SupabaseSession = Depends(
         require_roles("authenticated", "admin", "service_role")
     ),
 ) -> schemas.AdminOrgOverview:
-    """Return a consolidated snapshot of the first organization for demos."""
+    """Return an overview of the organization visible to the current admin."""
 
-    org = await _fetch_org(session)
+    requested_org_id: Optional[uuid.UUID] = None
+    if org_id:
+        try:
+            requested_org_id = uuid.UUID(org_id)
+        except ValueError as exc:  # pragma: no cover - invalid client input
+            raise HTTPException(status_code=400, detail="Invalid organization id") from exc
 
-    membership = next(
-        (
-            member
-            for member in org.members
-            if member.supabase_user_id == current_session.user.id
-        ),
-        None,
+    membership_query = (
+        select(models.OrgMember)
+        .where(models.OrgMember.supabase_user_id == current_session.user.id)
+        .order_by(models.OrgMember.created_at)
     )
-    if membership is None:
+    if requested_org_id is not None:
+        membership_query = membership_query.where(
+            models.OrgMember.org_id == requested_org_id
+        )
+
+    membership_result = await session.execute(membership_query)
+    membership = membership_result.scalars().first()
+
+    target_org_id = requested_org_id or (membership.org_id if membership else None)
+
+    org: Optional[models.Org] = None
+    if target_org_id is not None:
+        org = await _fetch_org(session, target_org_id)
+    elif current_session.user.has_role("service_role"):
+        # Service role tokens may request the first available organization.
+        org = await _fetch_org(session)
+
+    if membership is None and org is not None:
         membership = _find_membership_for_email(org, current_session.user.email)
 
     is_service_role = current_session.user.has_role("service_role")
@@ -596,5 +616,8 @@ async def get_demo_overview(
         and not is_service_role
     ):
         return _empty_admin_overview(org, membership, current_session)
+
+    if org is None:
+        return _empty_admin_overview(None, membership, current_session)
 
     return await _build_admin_overview(session, org, membership, current_session)
