@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ReactQueryClientProvider } from "../providers/react-query-provider";
+import { SupabaseProvider } from "../providers/supabase-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -18,7 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="bg-zinc-50 text-zinc-900">
-        <ReactQueryClientProvider>{children}</ReactQueryClientProvider>
+        <ReactQueryClientProvider>
+          <SupabaseProvider>{children}</SupabaseProvider>
+        </ReactQueryClientProvider>
       </body>
     </html>
   );

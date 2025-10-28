@@ -9,8 +9,11 @@ import { Badge } from "../../../../components/ui/badge";
 
 export default function DashboardPage() {
   const { state } = useAdminData();
-  const activeInvites = state.invitations.filter((invite) => invite.status !== "submitted" && invite.status !== "revoked");
+  const activeInvites = state.invitations.filter(
+    (invite) => invite.status !== "submitted" && invite.status !== "revoked",
+  );
   const submitted = state.invitations.filter((invite) => invite.status === "submitted");
+  const nextActiveDeadline = activeInvites.find((invite) => Boolean(invite.startDeadline))?.startDeadline ?? null;
 
   return (
     <div className="space-y-8">
@@ -42,8 +45,8 @@ export default function DashboardPage() {
             <CardTitle className="text-3xl font-bold">{activeInvites.length}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-zinc-500">
-            {activeInvites[0]
-              ? `Next deadline ${formatDistanceToNow(new Date(activeInvites[0].startDeadline), { addSuffix: true })}`
+            {nextActiveDeadline
+              ? `Next deadline ${formatDistanceToNow(new Date(nextActiveDeadline), { addSuffix: true })}`
               : "No pending deadlines"}
           </CardContent>
         </Card>
@@ -79,7 +82,10 @@ export default function DashboardPage() {
                 <CardContent className="space-y-3 text-sm text-zinc-500">
                   <p>Repo: {repo?.repoFullName ?? "Provisioning"}</p>
                   <p>
-                    Start deadline: {formatDistanceToNow(new Date(invite.startDeadline), { addSuffix: true })}
+                    Start deadline:
+                    {invite.startDeadline
+                      ? ` ${formatDistanceToNow(new Date(invite.startDeadline), { addSuffix: true })}`
+                      : " Not scheduled"}
                   </p>
                   {invite.completeDeadline && (
                     <p>

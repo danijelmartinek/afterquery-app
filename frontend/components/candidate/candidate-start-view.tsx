@@ -1,19 +1,101 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import type { Assessment, CandidateRepo, Invitation, Seed } from "../../lib/types";
+import {
+  startCandidateAssessment,
+  submitCandidateAssessment,
+} from "../../lib/api";
+import type {
+  CandidateRepo,
+  CandidateStartAssessment,
+  CandidateStartInvitation,
+  CandidateStartSeed,
+} from "../../lib/types";
 
 type CandidateStartViewProps = {
-  invitation: Invitation;
-  assessment: Assessment;
-  seed: Seed;
+  invitation: CandidateStartInvitation;
+  assessment: CandidateStartAssessment;
+  seed: CandidateStartSeed;
   repo?: CandidateRepo;
+  startToken: string;
 };
 
-export function CandidateStartView({ invitation, assessment, seed, repo }: CandidateStartViewProps) {
+export function CandidateStartView({ invitation, assessment, seed, repo, startToken }: CandidateStartViewProps) {
+  const router = useRouter();
+  const [currentInvitation, setCurrentInvitation] = useState(invitation);
+  const [currentRepo, setCurrentRepo] = useState<CandidateRepo | undefined>(repo);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<"start" | "finish" | null>(null);
+  const [isRefreshing, startRefresh] = useTransition();
+
+  const formatDate = (value: string | null) => {
+    if (!value) {
+      return null;
+    }
+    return new Date(value).toLocaleString();
+  };
+
+  const refreshPage = () => {
+    startRefresh(() => {
+      router.refresh();
+    });
+  };
+
+  const handleStart = async () => {
+    setActiveAction("start");
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const result = await startCandidateAssessment(startToken);
+      setCurrentInvitation((prev) => ({
+        ...prev,
+        status: result.status,
+        startedAt: result.startedAt,
+        completeDeadline: result.completeDeadline,
+      }));
+      setCurrentRepo(result.candidateRepo);
+      setActionMessage(
+        `You're marked as started. Your private repo is ${result.candidateRepo.repoFullName}.`,
+      );
+      refreshPage();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to mark as started.");
+    } finally {
+      setActiveAction(null);
+    }
+  };
+
+  const handleFinish = async () => {
+    setActiveAction("finish");
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const result = await submitCandidateAssessment(startToken);
+      setCurrentInvitation((prev) => ({
+        ...prev,
+        status: result.status,
+        submittedAt: result.submittedAt,
+      }));
+      setActionMessage("Thanks! We've marked your assessment as submitted.");
+      refreshPage();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to mark as finished.");
+    } finally {
+      setActiveAction(null);
+    }
+  };
+
+  const hasStarted =
+    currentInvitation.status === "started" || currentInvitation.status === "submitted";
+  const canFinish = currentInvitation.status === "started";
+  const isSubmitted = currentInvitation.status === "submitted";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-zinc-50 px-6 py-10">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -22,7 +104,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo }: Candi
             Afterquery Assessment
           </span>
           <h1 className="text-3xl font-semibold text-zinc-900">{assessment.title}</h1>
-          <p className="text-sm text-zinc-600">Invited for {invitation.candidateName}</p>
+          <p className="text-sm text-zinc-600">Invited for {currentInvitation.candidateName}</p>
         </div>
 
         <Card>
@@ -37,15 +119,19 @@ export function CandidateStartView({ invitation, assessment, seed, repo }: Candi
               <div>
                 <p className="text-xs uppercase tracking-wide text-zinc-400">Start by</p>
                 <p className="text-base font-semibold text-zinc-900">
-                  {new Date(invitation.startDeadline).toLocaleString()}
+                  {formatDate(currentInvitation.startDeadline) ?? "Schedule coming soon"}
                 </p>
               </div>
-              <Badge>Complete within {assessment.timeToCompleteHours}h</Badge>
+              <Badge>
+                {currentInvitation.completeDeadline
+                  ? `Complete by ${formatDate(currentInvitation.completeDeadline)}`
+                  : `Complete within ${assessment.timeToCompleteHours}h`}
+              </Badge>
             </div>
             <div>
               <p className="font-semibold text-zinc-800">1. Authenticate Git</p>
               <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
-                git credential fill | curl -s https://app.afterquery.dev/git/credential?token={invitation.startLinkToken}
+                git credential fill | curl -s https://app.afterquery.dev/git/credential?token={startToken}
               </code>
               <p className="mt-2 text-xs text-zinc-500">
                 This helper exchanges your invite token for a temporary GitHub App token. Keep the terminal open to refresh as needed.
@@ -63,9 +149,9 @@ export function CandidateStartView({ invitation, assessment, seed, repo }: Candi
                 Push your final commits to <span className="font-mono">main</span> before the completion window expires. We'll email confirmation immediately.
               </p>
             </div>
-            {repo && (
+            {currentRepo && (
               <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50 p-4 text-xs text-blue-700">
-                Repo already provisioned at <strong>{repo.repoFullName}</strong>. Resume work from your local clone.
+                Repo provisioned at <strong>{currentRepo.repoFullName}</strong>. Resume work from your local clone.
               </div>
             )}
           </CardContent>
@@ -79,12 +165,39 @@ export function CandidateStartView({ invitation, assessment, seed, repo }: Candi
             </CardDescription>
           </CardHeader>
           <CardContent className="prose prose-zinc max-w-none">
-            <ReactMarkdown>{assessment.instructions}</ReactMarkdown>
+            <ReactMarkdown>{assessment.instructions ?? ""}</ReactMarkdown>
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
-          <Button size="lg">Mark as started</Button>
+        <div className="space-y-2">
+          {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+          {actionMessage && <p className="text-sm text-green-700">{actionMessage}</p>}
+          {isSubmitted && currentInvitation.submittedAt && (
+            <p className="text-sm text-green-700">
+              Assessment submitted on {formatDate(currentInvitation.submittedAt)}. We'll be in touch soon.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {!hasStarted && (
+              <Button
+                size="lg"
+                onClick={handleStart}
+                disabled={activeAction !== null || isRefreshing}
+              >
+                {activeAction === "start" ? "Marking..." : "Mark as started"}
+              </Button>
+            )}
+            {canFinish && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleFinish}
+                disabled={activeAction !== null || isRefreshing}
+              >
+                {activeAction === "finish" ? "Submitting..." : "Mark as finished"}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

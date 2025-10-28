@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
+from ..services.supabase_memberships import ensure_org_membership
 
 router = APIRouter(prefix="/api/orgs", tags=["orgs"])
 
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api/orgs", tags=["orgs"])
 async def create_org(
     payload: schemas.OrgCreate,
     session: AsyncSession = Depends(get_session),
-    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
+    current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> schemas.OrgRead:
     existing = await session.execute(select(models.Org).where(models.Org.name == payload.name))
     if existing.scalar_one_or_none() is not None:
@@ -27,6 +28,10 @@ async def create_org(
 
     org = models.Org(name=payload.name)
     session.add(org)
+    await session.flush()
+
+    await ensure_org_membership(session, org.id, current_session, role="owner", approve=True)
+
     await session.commit()
     await session.refresh(org)
     return schemas.OrgRead.from_orm(org)

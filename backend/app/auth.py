@@ -16,7 +16,8 @@ import jwt
 from jwt import algorithms
 from dotenv import find_dotenv, load_dotenv
 from fastapi import Depends, Header, HTTPException, status
-from pydantic import BaseSettings, Field, ValidationError
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings
 
 # Ensure environment variables from ``.env`` are loaded when this module is
 # imported. This mirrors the behavior used for the database configuration and
@@ -35,6 +36,8 @@ class SupabaseAuthSettings(BaseSettings):
     supabase_jwt_issuer: Optional[str] = Field(None, env="SUPABASE_JWT_ISSUER")
     supabase_jwks_ttl_seconds: int = Field(3600, env="SUPABASE_JWKS_TTL_SECONDS")
     supabase_http_timeout_seconds: float = Field(5.0, env="SUPABASE_HTTP_TIMEOUT_SECONDS")
+    supabase_jwt_secret: Optional[str] = Field(None, env="SUPABASE_JWT_SECRET")
+    supabase_jwt_algorithm: str = Field("HS256", env="SUPABASE_JWT_ALGORITHM")
 
 
 class SupabaseAuthError(RuntimeError):
@@ -54,17 +57,24 @@ def get_supabase_auth_settings() -> SupabaseAuthSettings:
 class _JWKSCache:
     """Caches Supabase JWKS responses to avoid fetching keys on every request."""
 
-    def __init__(self, jwks_url: str, ttl_seconds: int, timeout: float) -> None:
+    def __init__(
+        self,
+        jwks_url: str,
+        ttl_seconds: int,
+        timeout: float,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         self._jwks_url = jwks_url
         self._ttl_seconds = ttl_seconds
         self._timeout = timeout
         self._lock = asyncio.Lock()
         self._expires_at: float = 0.0
         self._keys: dict[str, Mapping[str, Any]] = {}
+        self._headers = dict(headers or {})
 
     async def _refresh(self) -> None:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(self._jwks_url)
+            response = await client.get(self._jwks_url, headers=self._headers or None)
             response.raise_for_status()
             payload = response.json()
 
@@ -169,22 +179,24 @@ class SupabaseAuth:
     def __init__(self, settings: SupabaseAuthSettings) -> None:
         self._settings = settings
         jwks_url = settings.supabase_url.rstrip("/") + "/auth/v1/jwks"
+        headers = {
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {settings.supabase_anon_key}",
+        }
         self._jwks_cache = _JWKSCache(
             jwks_url=jwks_url,
             ttl_seconds=settings.supabase_jwks_ttl_seconds,
             timeout=settings.supabase_http_timeout_seconds,
+            headers=headers,
         )
 
-    async def _decode_token(self, token: str) -> Mapping[str, Any]:
-        try:
-            header = jwt.get_unverified_header(token)
-        except jwt.PyJWTError as exc:
-            raise SupabaseAuthError("Supabase access token is malformed") from exc
-
-        kid = header.get("kid")
-        if not kid:
-            raise SupabaseAuthError("Supabase access token is missing a key id")
-
+    async def _decode_with_jwks(
+        self,
+        token: str,
+        kid: str,
+        issuer: str,
+        audience: str,
+    ) -> Mapping[str, Any]:
         try:
             key_data = await self._jwks_cache.get_key(kid)
         except httpx.HTTPError as exc:
@@ -201,16 +213,12 @@ class SupabaseAuth:
         except (TypeError, ValueError) as exc:  # pragma: no cover - invalid JWKS response
             raise SupabaseAuthError("Supabase signing key is invalid") from exc
 
-        issuer = self._settings.supabase_jwt_issuer or (
-            self._settings.supabase_url.rstrip("/") + "/auth/v1"
-        )
-
         try:
             payload = jwt.decode(
                 token,
                 rsa_key,
                 algorithms=["RS256"],
-                audience=self._settings.supabase_jwt_audience,
+                audience=audience,
                 issuer=issuer,
             )
         except jwt.ExpiredSignatureError as exc:
@@ -219,6 +227,78 @@ class SupabaseAuth:
             raise SupabaseAuthError("Supabase access token validation failed") from exc
 
         return payload
+
+    def _decode_with_shared_secret(
+        self,
+        token: str,
+        issuer: str,
+        audience: str,
+        algorithm_from_header: Optional[str],
+    ) -> Mapping[str, Any]:
+        secret = self._settings.supabase_jwt_secret
+        if not secret:
+            raise SupabaseAuthError("Supabase JWT secret fallback is not configured")
+
+        algorithm = self._settings.supabase_jwt_algorithm or "HS256"
+        if algorithm_from_header and algorithm_from_header != algorithm:
+            raise SupabaseAuthError(
+                "Supabase access token algorithm does not match the configured shared secret algorithm"
+            )
+
+        try:
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=[algorithm],
+                audience=audience,
+                issuer=issuer,
+            )
+        except jwt.ExpiredSignatureError as exc:
+            raise SupabaseAuthError("Supabase access token has expired") from exc
+        except jwt.PyJWTError as exc:
+            raise SupabaseAuthError("Supabase access token validation failed") from exc
+
+        return payload
+
+    async def _decode_token(self, token: str) -> Mapping[str, Any]:
+        try:
+            header = jwt.get_unverified_header(token)
+        except jwt.PyJWTError as exc:
+            raise SupabaseAuthError("Supabase access token is malformed") from exc
+
+        issuer = self._settings.supabase_jwt_issuer or (
+            self._settings.supabase_url.rstrip("/") + "/auth/v1"
+        )
+        audience = self._settings.supabase_jwt_audience
+        kid = header.get("kid")
+        last_error: Optional[SupabaseAuthError] = None
+
+        if kid:
+            try:
+                return await self._decode_with_jwks(token, kid, issuer, audience)
+            except SupabaseAuthError as exc:
+                last_error = exc
+
+        if self._settings.supabase_jwt_secret:
+            try:
+                return self._decode_with_shared_secret(
+                    token,
+                    issuer=issuer,
+                    audience=audience,
+                    algorithm_from_header=header.get("alg"),
+                )
+            except SupabaseAuthError as exc:
+                last_error = exc
+
+        if last_error is not None:
+            raise last_error
+
+        if not kid:
+            raise SupabaseAuthError(
+                "Supabase access token is missing a key id and no shared secret fallback is configured"
+            )
+
+        raise SupabaseAuthError("Supabase access token validation failed")
 
     async def _fetch_user(self, token: str) -> Mapping[str, Any]:
         headers = {

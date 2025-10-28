@@ -1,9 +1,11 @@
 "use client";
 
-import { addHours } from "date-fns";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAdminData } from "../../../../../../../providers/admin-data-provider";
+import { useSupabaseAuth } from "../../../../../../../providers/supabase-provider";
+import { createInvitations } from "../../../../../../../lib/api";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../../lib/invite-links";
 import { Button } from "../../../../../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../../components/ui/card";
 import { Input } from "../../../../../../../components/ui/input";
@@ -15,11 +17,16 @@ import Link from "next/link";
 export default function AssessmentInvitesPage() {
   const params = useParams<{ assessmentId: string }>();
   const { state, dispatch } = useAdminData();
+  const { accessToken } = useSupabaseAuth();
   const assessment = state.assessments.find((item) => item.id === params.assessmentId);
   const [formState, setFormState] = useState({
     candidateName: "",
     candidateEmail: "",
   });
+  const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
+  const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
 
   if (!assessment) {
     return <p className="text-sm text-zinc-500">Assessment not found.</p>;
@@ -27,30 +34,90 @@ export default function AssessmentInvitesPage() {
 
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
 
-  function handleCreateInvite(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (!candidateBaseFromEnv && typeof window !== "undefined") {
+      setRuntimeOrigin(window.location.origin);
+    }
+  }, []);
+
+  async function handleCreateInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!assessment) return;
     if (!formState.candidateEmail) return;
-    const sentAt = new Date();
-    const startDeadline = addHours(sentAt, assessment.timeToStartHours);
-    const completeDeadline = addHours(sentAt, assessment.timeToStartHours + assessment.timeToCompleteHours);
+    if (!accessToken) {
+      setError("Sign in to send invitations");
+      return;
+    }
 
-    dispatch({
-      type: "createInvitation",
-      payload: {
-        id: `invite-${crypto.randomUUID()}`,
-        assessmentId: assessment.id,
-        candidateEmail: formState.candidateEmail,
-        candidateName: formState.candidateName || formState.candidateEmail,
-        status: "sent",
-        startDeadline: startDeadline.toISOString(),
-        completeDeadline: completeDeadline.toISOString(),
-        startLinkToken: crypto.randomUUID(),
-        sentAt: sentAt.toISOString(),
-      },
-    });
+    setError(null);
+    setIsSending(true);
+    try {
+      const created = await createInvitations(
+        assessment.id,
+        [
+          {
+            candidateEmail: formState.candidateEmail,
+            candidateName: formState.candidateName,
+          },
+        ],
+        { accessToken },
+      );
+      const linkBase =
+        runtimeOrigin ?? (typeof window !== "undefined" ? window.location.origin : null);
+      created.forEach((invite) => {
+        dispatch({ type: "createInvitation", payload: invite });
+        const inviteLink = buildCandidateStartLink(invite.startLinkToken, linkBase);
+        if (inviteLink) {
+          console.log(
+            `[afterquery] Invitation ready for ${invite.candidateEmail} – share ${inviteLink} with the candidate.`,
+          );
+        } else {
+          console.log(
+            `[afterquery] Invitation ready for ${invite.candidateEmail} – start link unavailable in response.`,
+          );
+        }
+      });
+      setFormState({ candidateName: "", candidateEmail: "" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create invitation";
+      setError(message);
+    } finally {
+      setIsSending(false);
+    }
+  }
 
-    setFormState({ candidateName: "", candidateEmail: "" });
+  function scheduleReset(inviteId: string) {
+    setTimeout(() => {
+      setCopyStates((prev) => {
+        if (!(inviteId in prev)) {
+          return prev;
+        }
+        const { [inviteId]: _, ...rest } = prev;
+        return rest;
+      });
+    }, 2000);
+  }
+
+  async function handleCopyInvite(inviteId: string, startLinkToken?: string | null) {
+    const inviteLink = buildCandidateStartLink(startLinkToken, runtimeOrigin);
+    if (!inviteLink) {
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
+      scheduleReset(inviteId);
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(inviteLink);
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "copied" }));
+      scheduleReset(inviteId);
+    } catch (copyError) {
+      console.error("Failed to copy invite link", copyError);
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
+      scheduleReset(inviteId);
+    }
   }
 
   return (
@@ -65,7 +132,10 @@ export default function AssessmentInvitesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">New invitation</CardTitle>
-          <CardDescription>Generating an invite will email the candidate instantly.</CardDescription>
+          <CardDescription>
+            While email delivery is wiring up, new invites log the candidate link to the developer
+            console.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateInvite} className="grid gap-4 md:grid-cols-2">
@@ -87,11 +157,14 @@ export default function AssessmentInvitesPage() {
                 onChange={(event) => setFormState((prev) => ({ ...prev, candidateEmail: event.target.value }))}
               />
             </div>
-            <div className="md:col-span-2 flex justify-end gap-3">
+            <div className="md:col-span-2 flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
               <Button variant="outline" asChild>
                 <Link href={`/app/dashboard/assessments/${assessment.id}`}>Cancel</Link>
               </Button>
-              <Button type="submit">Send invite</Button>
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              <Button type="submit" disabled={isSending}>
+                {isSending ? "Sending..." : "Send invite"}
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -111,6 +184,7 @@ export default function AssessmentInvitesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Start deadline</TableHead>
                 <TableHead>Complete deadline</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -121,13 +195,30 @@ export default function AssessmentInvitesPage() {
                   <TableCell>
                     <Badge className="capitalize">{invite.status}</Badge>
                   </TableCell>
-                  <TableCell>{new Date(invite.startDeadline).toLocaleString()}</TableCell>
-                  <TableCell>{invite.completeDeadline ? new Date(invite.completeDeadline).toLocaleString() : "—"}</TableCell>
+                  <TableCell>
+                    {invite.startDeadline ? new Date(invite.startDeadline).toLocaleString() : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {invite.completeDeadline ? new Date(invite.completeDeadline).toLocaleString() : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
+                    >
+                      {copyStates[invite.id] === "copied"
+                        ? "Copied!"
+                        : copyStates[invite.id] === "error"
+                          ? "Copy failed"
+                          : "Copy invite link"}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {invites.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-zinc-500">
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-zinc-500">
                     No invites yet.
                   </TableCell>
                 </TableRow>

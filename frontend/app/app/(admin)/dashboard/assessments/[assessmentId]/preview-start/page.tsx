@@ -1,11 +1,13 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useAdminData } from "../../../../../../../providers/admin-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../../components/ui/card";
 import { Button } from "../../../../../../../components/ui/button";
 import { Badge } from "../../../../../../../components/ui/badge";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../../lib/invite-links";
 
 export default function PreviewStartPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -17,6 +19,48 @@ export default function PreviewStartPage() {
   if (!assessment || !seed) {
     return <p className="text-sm text-zinc-500">Assessment not found.</p>;
   }
+
+  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+
+  useEffect(() => {
+    if (!candidateBaseFromEnv && typeof window !== "undefined") {
+      setRuntimeOrigin(window.location.origin);
+    }
+  }, []);
+
+  const latestInvitation = useMemo(
+    () =>
+      state.invitations
+        .filter((invitation) => invitation.assessmentId === assessment.id && invitation.startLinkToken)
+        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())[0] ?? null,
+    [assessment.id, state.invitations],
+  );
+
+  const inviteLink = useMemo(
+    () => buildCandidateStartLink(latestInvitation?.startLinkToken, runtimeOrigin),
+    [latestInvitation?.startLinkToken, runtimeOrigin],
+  );
+
+  const handleCopy = useCallback(async () => {
+    if (!inviteLink) {
+      setCopyState("error");
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(inviteLink);
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 2000);
+    } catch (error) {
+      console.error("Failed to copy invite link", error);
+      setCopyState("error");
+      setTimeout(() => setCopyState("idle"), 2000);
+    }
+  }, [inviteLink]);
 
   const content = (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -53,8 +97,15 @@ export default function PreviewStartPage() {
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline">Send test email</Button>
-            <Button>Copy invite link</Button>
+            <Button onClick={handleCopy}>
+              {copyState === "copied" ? "Copied!" : copyState === "error" ? "Copy failed" : "Copy invite link"}
+            </Button>
           </div>
+          {!inviteLink && (
+            <p className="text-right text-xs text-zinc-500">
+              Create an invitation to generate a candidate start link you can share.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
