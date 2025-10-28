@@ -127,6 +127,7 @@ class GitHubInstallationState(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    return_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     org: Mapped[Org] = relationship()
 

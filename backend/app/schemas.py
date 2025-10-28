@@ -347,6 +347,8 @@ class CandidateStartData(CamelModel):
 
 class GitHubInstallationStartRequest(CamelModel):
     org_id: UUID
+    redirect_url: Optional[str] = None
+    return_path: Optional[str] = None
 
 
 class GitHubInstallationStartResponse(CamelModel):
@@ -356,4 +358,9 @@ class GitHubInstallationStartResponse(CamelModel):
 class GitHubInstallationCompleteRequest(CamelModel):
     state: str
     installation_id: int
+
+
+class GitHubInstallationCompleteResponse(CamelModel):
+    installation: AdminGitHubInstallation
+    return_path: Optional[str] = None
 

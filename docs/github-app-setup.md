@@ -1,52 +1,55 @@
 # GitHub App setup
 
-The coding assessment workflow provisions seed and candidate repositories by
-calling the GitHub App installation APIs. Follow the steps below to create the
-app, capture its credentials, and wire it into the Afterquery backend.
+The Afterquery admin dashboard provisions repositories through an organization-scoped
+GitHub App installation. Follow the steps below to create the app, wire the
+credentials into the backend, and validate that admins can connect the app from
+the product UI.
 
 ## 1. Create the GitHub App
 
-1. Sign in to GitHub with the owner account for the organization that will host
-   the mirrored seed repositories (e.g. `github.com/your-company`).
-2. Navigate to **Settings → Developer settings → GitHub Apps** and click
-   **New GitHub App**.
-3. Use a descriptive name such as `Afterquery Assessment Helper` and provide a
-   homepage URL for your product (the URL is informational only).
-4. Leave the **Webhook** section disabled for now. The backend polls for status
-   and does not require inbound webhooks yet.
-5. Under **Repository permissions** grant the following scopes:
-   - **Administration** – Read & write (needed to create repos and configure
-     templates).
-   - **Contents** – Read & write (needed to import code and push branch
-     protections).
+1. Sign in with the GitHub organization owner account that will host mirrored
+   repositories (for example `github.com/your-company`).
+2. Go to **Settings → Developer settings → GitHub Apps** and click **New GitHub
+   App**.
+3. Provide a descriptive name such as `Afterquery Assessment Helper` and an
+   informational homepage URL.
+4. Leave webhooks disabled for now – the backend polls for repository status and
+   does not require inbound events yet.
+5. Set the **Callback URL** to the admin frontend callback route, e.g.
+   `https://app.yourdomain.com/app/github/install/callback`. The app uses this
+   URL when a user completes the installation flow.
+6. (Optional) Set the **Setup URL** to the same callback route so the **Install
+   App** button in GitHub also returns to Afterquery.
+7. Under **Repository permissions** grant:
+   - **Administration** – Read & write (to create repositories and set template
+     defaults).
+   - **Contents** – Read & write (to import starter code and push updates).
    - **Metadata** – Read.
-   - **Pull requests** – Read & write (reserved for review comments).
-6. Leave **Organization permissions** at their defaults unless you plan to use
-   org-level endpoints later.
-7. Enable the **Repository** event subscription so the app can receive future
-   webhooks if required.
-8. Save the app and **Generate a private key**. Download the PEM file – you will
-   reference it in the environment variables below.
+   - **Pull requests** – Read & write (reserved for review tooling).
+8. Leave **Organization permissions** at the defaults unless you plan to extend
+   the automation later.
+9. Enable the **Repository** event subscription for future webhook expansion.
+10. Save the app and generate a private key. Download the PEM file – the backend
+    consumes the raw key material.
 
 ## 2. Install the app on your organization
 
 1. From the GitHub App settings page click **Install App** and choose the target
    organization.
-2. Select **All repositories**. The backend manages the visibility of new seed
-   and candidate repositories and expects access to create them on-demand. Make
-   sure the app is installed on any private starter repositories you plan to
-   mirror so the import step can clone their contents.
-3. After installation note the URL – the numeric segment at the end is the
-   administrators can initiate the installation from the Afterquery dashboard; the callback captures the installation details automatically.
+2. Select **All repositories** so the backend can create new seed and candidate
+   repositories on demand.
+3. Finish the installation – Afterquery captures the installation identifier
+   automatically, and the admin UI now records the page where the install began.
+   After successful authorization the user is redirected back to that page so
+   they can continue adding repositories without losing context.
 
-## 3. Configure environment variables
+## 3. Configure backend environment variables
 
-Populate the following variables in the FastAPI backend environment (or your
-local `.env` file):
+Add the following variables to the FastAPI environment (for local development
+place them in `backend/.env`):
 
 ```bash
 GITHUB_APP_ID=123456
-# Paste the PEM contents or a base64/\n escaped version – the backend normalises the value.
 GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 GITHUB_APP_SLUG=your-app-slug
 # Optional overrides
@@ -55,40 +58,36 @@ GITHUB_APP_SLUG=your-app-slug
 # GITHUB_CANDIDATE_PREFIX=afterquery-candidate
 ```
 
-Install the backend dependenciesAdministrators can trigger the GitHub App installation from the Afterquery dashboard when adding a seed repository. The FastAPI callback stores the installation metadata in the project record so no manual copying of installation ids is required.
-
- to ensure the GitHub App helper can mint
-RS256-signed tokens:
+The helper automatically normalises newline-escaped or base64 encoded private
+keys. Install the backend dependencies so the GitHub App client can mint
+RS256-signed JWTs:
 
 ```bash
 pip install -r backend/requirements.txt
 ```
 
-The backend shells out to the system `git` client to mirror repositories. Make
-sure Git is installed on the host where the FastAPI service runs (Git 2.30 or
+Ensure the host running FastAPI has the `git` CLI available (version 2.30 or
 newer is recommended).
-
-Commit the variables to your deployment platform’s secret store. The new
-`backend/app/github_app.py` helper consumes these settings and caches the
-installation token automatically.
 
 ## 4. Verify access
 
-Before inviting candidates run a quick smoke test:
+1. Start the backend with `uvicorn backend.app.main:app --reload`.
+2. From the admin dashboard click **Connect GitHub App**. The flow will open
+   GitHub, ask for the installation scope, and redirect to
+   `/app/github/install/callback`.
+3. After completing the flow you should land back on the page where you clicked
+   **Connect GitHub App**. Adding a seed repository will now succeed, and future
+   admin overview calls return the installation details.
 
-```bash
-# Uses the cached JWT + installation token to list repositories the app can access
-uvicorn backend.app.main:app --reload
-curl -H "Authorization: Bearer <SUPABASE_SERVICE_TOKEN>" \
-  "http://localhost:8000/api/seeds" # create a seed from the UI afterwards
-```
-
-Seeds and candidate repositories are created inside the connected GitHub organization using the configurable prefixes, and the backend automatically marks the seed repository as a private template with the `main` default branch once the installation is complete.
+Seeds and candidate repositories are created inside the connected GitHub
+organization using the configured prefixes. The FastAPI callback stores the
+installation metadata on the project so no manual copy/paste of installation IDs
+is required.
 
 ## 5. Optional: branch protection & webhooks
 
-If you would like to enforce branch protection or react to repository events,
-you can extend the GitHub App permissions and configure the webhook URL to
-point at a FastAPI endpoint (e.g. `/api/github/webhook`). The current
-implementation does not require incoming events, but the GitHub App can be
-augmented without any schema changes.
+To enforce branch protection rules or react to repository events, extend the
+GitHub App permissions and configure the webhook URL to point at a FastAPI
+endpoint (for example `/api/github/webhook`). The current backend does not
+consume inbound events, but the app can be enhanced without schema changes when
+needed.

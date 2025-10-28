@@ -412,32 +412,48 @@ type GitHubInstallationStartResponse = {
   installationUrl: string;
 };
 
+export type GitHubInstallationStartOptions = ApiRequestOptions & {
+  redirectUrl?: string;
+  returnPath?: string;
+};
+
 export async function startGitHubInstallation(
   orgId: string,
-  options: ApiRequestOptions = {},
+  options: GitHubInstallationStartOptions = {},
 ) {
+  const { redirectUrl, returnPath, headers, ...requestOptions } = options;
+
   const response = await fetchJson<GitHubInstallationStartResponse>(
     "/api/github/installations/start",
     {
-      ...options,
+      ...requestOptions,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(options.headers ?? {}),
+        ...(headers ?? {}),
       },
-      body: JSON.stringify({ org_id: orgId }),
+      body: JSON.stringify({
+        org_id: orgId,
+        ...(redirectUrl ? { redirect_url: redirectUrl } : {}),
+        ...(returnPath ? { return_path: returnPath } : {}),
+      }),
     },
   );
 
   return response.installationUrl;
 }
 
+type GitHubInstallationCompleteResponse = {
+  installation: GitHubInstallation;
+  returnPath?: string | null;
+};
+
 export async function completeGitHubInstallation(
   state: string,
   installationId: number,
   options: ApiRequestOptions = {},
-): Promise<GitHubInstallation> {
-  return fetchJson<GitHubInstallation>("/api/github/installations/complete", {
+): Promise<GitHubInstallationCompleteResponse> {
+  return fetchJson<GitHubInstallationCompleteResponse>("/api/github/installations/complete", {
     ...options,
     method: "POST",
     headers: {

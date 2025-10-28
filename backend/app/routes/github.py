@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import Optional
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
@@ -22,6 +24,59 @@ from ..services.supabase_memberships import require_org_membership_role
 router = APIRouter(prefix="/api/github", tags=["github"])
 
 
+def _normalize_return_path(candidate: Optional[str]) -> Optional[str]:
+    """Limit redirects to in-app paths while preserving query strings."""
+
+    if not candidate:
+        return None
+
+    trimmed = candidate.strip()
+    if not trimmed:
+        return None
+
+    if trimmed.startswith(("http://", "https://")):
+        parsed = urlsplit(trimmed)
+        path = parsed.path or "/"
+        if not path.startswith("/"):
+            path = f"/{path.lstrip('/')}"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        if parsed.fragment:
+            path = f"{path}#{parsed.fragment}"
+        trimmed = path
+
+    if not trimmed.startswith("/"):
+        trimmed = f"/{trimmed.lstrip('/')}"
+
+    if len(trimmed) > 512:
+        trimmed = trimmed[:512]
+
+    return trimmed
+
+
+def _normalize_redirect_url(candidate: Optional[str]) -> Optional[str]:
+    """Validate the GitHub installation redirect URL."""
+
+    if not candidate:
+        return None
+
+    trimmed = candidate.strip()
+    if not trimmed:
+        return None
+
+    parsed = urlsplit(trimmed)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+
+    normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    if parsed.query:
+        normalized = f"{normalized}?{parsed.query}"
+    if parsed.fragment:
+        normalized = f"{normalized}#{parsed.fragment}"
+
+    return normalized
+
+
 @router.post(
     "/installations/start",
     response_model=schemas.GitHubInstallationStartResponse,
@@ -34,6 +89,8 @@ async def start_github_installation(
     ),
 ) -> schemas.GitHubInstallationStartResponse:
     org_id = payload.org_id
+    return_path = _normalize_return_path(payload.return_path)
+    redirect_url = _normalize_redirect_url(payload.redirect_url)
 
     org_result = await session.execute(
         select(models.Org).where(models.Org.id == org_id)
@@ -62,6 +119,7 @@ async def start_github_installation(
         token=state_token,
         org_id=org_id,
         expires_at=expires_at,
+        return_path=return_path,
     )
     session.add(state)
     await session.commit()
@@ -72,15 +130,20 @@ async def start_github_installation(
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    query_params = {"state": state_token}
+    if redirect_url:
+        query_params["redirect_url"] = redirect_url
+
     installation_url = (
-        f"https://github.com/apps/{app_slug}/installations/new?state={state_token}"
+        f"https://github.com/apps/{app_slug}/installations/new?"
+        f"{urlencode(query_params)}"
     )
     return schemas.GitHubInstallationStartResponse(installation_url=installation_url)
 
 
 @router.post(
     "/installations/complete",
-    response_model=schemas.AdminGitHubInstallation,
+    response_model=schemas.GitHubInstallationCompleteResponse,
 )
 async def complete_github_installation(
     payload: schemas.GitHubInstallationCompleteRequest,
@@ -88,7 +151,7 @@ async def complete_github_installation(
     current_session: SupabaseSession = Depends(
         require_roles("authenticated", "service_role")
     ),
-) -> schemas.AdminGitHubInstallation:
+) -> schemas.GitHubInstallationCompleteResponse:
     state_token = payload.state.strip()
     if not state_token:
         raise HTTPException(status_code=400, detail="State token is required")
@@ -187,8 +250,13 @@ async def complete_github_installation(
         installation_model.installation_html_url = installation_html_url
         installation_model.updated_at = now
 
+    return_path = _normalize_return_path(state.return_path)
+
     await session.delete(state)
     await session.commit()
     await session.refresh(installation_model)
 
-    return github_installation_to_schema(installation_model)
+    return schemas.GitHubInstallationCompleteResponse(
+        installation=github_installation_to_schema(installation_model),
+        return_path=return_path,
+    )

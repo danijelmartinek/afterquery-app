@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS github_installation_states (
   token text PRIMARY KEY,
   org_id uuid REFERENCES orgs(id) ON DELETE CASCADE,
   expires_at timestamptz NOT NULL,
+  return_path text,
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_github_installation_states_org_id ON github_installation_states(org_id);

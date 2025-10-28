@@ -84,7 +84,13 @@ export default function NewAssessmentPage() {
 
     try {
       setConnectingGitHub(true);
-      const installationUrl = await startGitHubInstallation(org.id, { accessToken });
+      const callbackUrl = `${window.location.origin}/app/github/install/callback`;
+      const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const installationUrl = await startGitHubInstallation(org.id, {
+        accessToken,
+        redirectUrl: callbackUrl,
+        returnPath,
+      });
       window.location.href = installationUrl;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to start GitHub installation";

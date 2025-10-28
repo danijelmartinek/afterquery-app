@@ -17,6 +17,7 @@ export default function GitHubInstallCallbackPage() {
 
   const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [destinationPath, setDestinationPath] = useState<string>("/app/dashboard");
 
   const setupAction = useMemo(() => searchParams.get("setup_action") ?? "install", [searchParams]);
 
@@ -51,12 +52,15 @@ export default function GitHubInstallCallbackPage() {
     setErrorMessage(null);
 
     completeGitHubInstallation(stateParam, installationId, { accessToken })
-      .then((installation) => {
+      .then(({ installation, returnPath }) => {
         if (!active) return;
         dispatch({ type: "setGitHubInstallation", payload: installation });
         setStatus("success");
+        const target =
+          returnPath && returnPath.startsWith("/") ? returnPath : "/app/dashboard";
+        setDestinationPath(target);
         setTimeout(() => {
-          router.replace("/app/dashboard");
+          router.replace(target);
         }, 1500);
       })
       .catch((error) => {
@@ -73,7 +77,7 @@ export default function GitHubInstallCallbackPage() {
 
   const description = useMemo(() => {
     if (status === "success") {
-      return "GitHub App connected. Redirecting you back to the dashboard.";
+      return "GitHub App connected. Redirecting you back to where you started.";
     }
     if (status === "error") {
       return errorMessage ?? "Something went wrong while connecting the GitHub App.";
@@ -102,9 +106,9 @@ export default function GitHubInstallCallbackPage() {
           ) : null}
         </CardContent>
         <CardFooter className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => router.replace("/app/dashboard")}>Return to dashboard</Button>
+          <Button variant="outline" onClick={() => router.replace(destinationPath)}>Return to workspace</Button>
           {status === "error" ? (
-            <Button onClick={() => router.replace("/app/dashboard")}>Try again</Button>
+            <Button onClick={() => router.replace(destinationPath)}>Try again</Button>
           ) : null}
         </CardFooter>
       </Card>
