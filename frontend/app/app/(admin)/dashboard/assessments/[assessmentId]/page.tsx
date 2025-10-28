@@ -2,14 +2,14 @@
 
 import { useParams, useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
-import { useAdminData } from "../../../../../../providers/admin-data-provider";
-import { Button } from "../../../../../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../components/ui/card";
-import { Badge } from "../../../../../../components/ui/badge";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
-import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../lib/invite-links";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "@/lib/invite-links";
 
 export default function AssessmentDetailPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -149,17 +149,19 @@ export default function AssessmentDetailPage() {
                   <Button asChild size="sm" variant="outline">
                     <Link href={`/app/review/${invite.id}`}>Review</Link>
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
-                  >
-                    {copyStates[invite.id] === "copied"
-                      ? "Copied!"
-                      : copyStates[invite.id] === "error"
-                        ? "Copy failed"
-                        : "Copy invite link"}
-                  </Button>
+                  {invite.startLinkToken ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
+                    >
+                      {copyStates[invite.id] === "copied"
+                        ? "Copied!"
+                        : copyStates[invite.id] === "error"
+                          ? "Copy failed"
+                          : "Copy invite link"}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>

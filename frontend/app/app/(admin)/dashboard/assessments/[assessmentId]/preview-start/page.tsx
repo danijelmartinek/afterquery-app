@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
-import { useAdminData } from "../../../../../../../providers/admin-data-provider";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../../components/ui/card";
-import { Button } from "../../../../../../../components/ui/button";
-import { Badge } from "../../../../../../../components/ui/badge";
-import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../../lib/invite-links";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "@/lib/invite-links";
 
 export default function PreviewStartPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -102,9 +102,11 @@ export default function PreviewStartPage() {
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline">Send test email</Button>
-            <Button onClick={handleCopy}>
-              {copyState === "copied" ? "Copied!" : copyState === "error" ? "Copy failed" : "Copy invite link"}
-            </Button>
+            {inviteLink ? (
+              <Button onClick={handleCopy}>
+                {copyState === "copied" ? "Copied!" : copyState === "error" ? "Copy failed" : "Copy invite link"}
+              </Button>
+            ) : null}
           </div>
           {!inviteLink && (
             <p className="text-right text-xs text-zinc-500">

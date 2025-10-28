@@ -107,17 +107,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="mt-auto pt-8">
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <p className="text-sm font-medium text-zinc-700">Need help?</p>
-            <p className="mt-1 text-xs text-zinc-500">
-              Review the architecture playbook before inviting candidates.
-            </p>
-            <Button className="mt-3 w-full" variant="subtle">
-              Open docs
-            </Button>
-          </div>
-        </div>
       </aside>
       <main className="flex-1">
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4">
