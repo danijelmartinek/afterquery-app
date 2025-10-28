@@ -236,6 +236,7 @@ class AccessToken(Base, TimestampMixin):
             native_enum=False,
             validate_strings=True,
             create_constraint=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=AccessScope.clone_push,
         nullable=False,
