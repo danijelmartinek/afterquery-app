@@ -1,0 +1,79 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
+import { useAdminData } from "../../providers/admin-data-provider";
+import { FileCode2, LayoutDashboard, Layers, LogOut, Mail } from "lucide-react";
+
+const NAV_LINKS = [
+  { href: "/app/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/app/dashboard/assessments", label: "Assessments", icon: Layers },
+  { href: "/app/review", label: "Reviews", icon: FileCode2 },
+  { href: "/app/settings/emails", label: "Email Templates", icon: Mail },
+];
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { currentAdmin, org } = useAdminData();
+
+  return (
+    <div className="flex min-h-screen bg-zinc-50">
+      <aside className="hidden w-72 shrink-0 border-r border-zinc-200 bg-white px-6 py-8 lg:block">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase text-zinc-400">Organization</p>
+            <p className="text-lg font-semibold text-zinc-900">{org.name}</p>
+          </div>
+          <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">Admin</span>
+        </div>
+        <nav className="mt-8 space-y-1">
+          {NAV_LINKS.map((link) => {
+            const Icon = link.icon;
+            const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900",
+                  isActive && "bg-zinc-100 text-zinc-900",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mt-auto pt-8">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+            <p className="text-sm font-medium text-zinc-700">Need help?</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Review the architecture playbook before inviting candidates.
+            </p>
+            <Button className="mt-3 w-full" variant="subtle">
+              Open docs
+            </Button>
+          </div>
+        </div>
+      </aside>
+      <main className="flex-1">
+        <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4">
+          <div>
+            <p className="text-sm text-zinc-500">Logged in as</p>
+            <p className="font-medium text-zinc-900">{currentAdmin.name}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" className="gap-2">
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+          </div>
+        </header>
+        <div className="px-6 py-8">{children}</div>
+      </main>
+    </div>
+  );
+}
