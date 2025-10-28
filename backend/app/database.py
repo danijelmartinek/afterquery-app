@@ -13,7 +13,16 @@ import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from dotenv import find_dotenv, load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# Load DATABASE_URL and other environment variables from the project root ``.env``
+# file, if present. ``find_dotenv`` walks up from the current working directory,
+# so it will locate the repository-level configuration even when this module is
+# imported from nested packages.
+_DOTENV_PATH = find_dotenv(filename=".env", raise_error_if_not_found=False, usecwd=True)
+if _DOTENV_PATH:
+    load_dotenv(_DOTENV_PATH)
 
 _DATABASE_URL_ENV = "DATABASE_URL"
 
