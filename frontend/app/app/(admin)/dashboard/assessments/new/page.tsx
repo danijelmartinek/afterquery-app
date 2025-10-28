@@ -268,7 +268,7 @@ export default function NewAssessmentPage() {
                   }}
                 />
                 <p className="text-xs text-zinc-500">
-                  We'll rename the source default branch to match what you enter here (defaults to main).
+                  We’ll rename the source default branch to match what you enter here (defaults to main).
                 </p>
               </div>
               {seedError ? <p className="text-xs text-red-600">{seedError}</p> : null}
