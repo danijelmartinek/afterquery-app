@@ -38,7 +38,9 @@ class GitHubAppSettings(BaseSettings):
 
     app_id: str = Field(..., alias="github_app_id", env="GITHUB_APP_ID")
     private_key: str = Field(..., alias="github_app_private_key", env="GITHUB_APP_PRIVATE_KEY")
-    app_slug: str = Field(..., alias="github_app_slug", env="GITHUB_APP_SLUG")
+    app_slug: Optional[str] = Field(
+        None, alias="github_app_slug", env="GITHUB_APP_SLUG"
+    )
     api_base_url: str = Field("https://api.github.com", env="GITHUB_API_BASE_URL")
     request_timeout_seconds: float = Field(15.0, env="GITHUB_HTTP_TIMEOUT_SECONDS")
     seed_repo_prefix: str = Field("afterquery-seed", env="GITHUB_SEED_PREFIX")
@@ -61,6 +63,15 @@ class GitHubAppSettings(BaseSettings):
         if "-----BEGIN" not in key:
             key = key.encode("utf-8").decode("unicode_escape")
         return key
+
+    def require_app_slug(self) -> str:
+        """Return the configured GitHub App slug or raise a helpful error."""
+
+        if not self.app_slug:
+            raise RuntimeError(
+                "GitHub App slug is not configured; set the GITHUB_APP_SLUG environment variable"
+            )
+        return self.app_slug
 
 
 @lru_cache

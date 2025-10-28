@@ -67,8 +67,13 @@ async def start_github_installation(
     await session.commit()
 
     settings = get_github_app_settings()
+    try:
+        app_slug = settings.require_app_slug()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     installation_url = (
-        f"https://github.com/apps/{settings.app_slug}/installations/new?state={state_token}"
+        f"https://github.com/apps/{app_slug}/installations/new?state={state_token}"
     )
     return schemas.GitHubInstallationStartResponse(installation_url=installation_url)
 
