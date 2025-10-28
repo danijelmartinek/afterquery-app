@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS email_templates (
 CREATE TABLE IF NOT EXISTS email_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   invitation_id uuid REFERENCES invitations(id) ON DELETE CASCADE,
-  type text CHECK (type IN ('invite','reminder','follow_up')),
+  type text CHECK (type IN ('invite','reminder','follow_up','assessment_started','submission_received')),
   provider_id text,
   to_email text,
   status text,

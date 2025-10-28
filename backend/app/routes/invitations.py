@@ -14,6 +14,12 @@ from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 from ..utils import generate_token, hash_token
+from ..services.email import (
+    EmailServiceError,
+    InvitationEmailPayload,
+    ResendEmailService,
+    get_resend_email_service,
+)
 from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/invitations", tags=["invitations"])
@@ -38,6 +44,7 @@ async def create_invitations(
     payload: schemas.InvitationBatchCreate,
     session: AsyncSession = Depends(get_session),
     current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
+    email_service: ResendEmailService = Depends(get_resend_email_service),
 ) -> list[schemas.InvitationRead]:
     assessment_id = payload.assessment_id
 
@@ -67,6 +74,19 @@ async def create_invitations(
         session.add(invitation)
         await session.flush()
         await session.refresh(invitation)
+        try:
+            await email_service.send_invitation_email(
+                session,
+                InvitationEmailPayload(
+                    invitation=invitation,
+                    assessment=assessment,
+                    start_link_token=raw_token,
+                ),
+            )
+        except EmailServiceError as exc:
+            await session.rollback()
+            raise HTTPException(status_code=502, detail="Failed to send invitation email") from exc
+
         created_invitations.append(
             schemas.InvitationRead(
                 id=str(invitation.id),

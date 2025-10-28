@@ -6,6 +6,7 @@ import type {
   CandidateStartInvitation,
   CandidateStartSeed,
   CandidateSubmitResult,
+  EmailTemplate,
   Invitation,
   InvitationStatus,
   Seed,
@@ -88,6 +89,33 @@ export async function fetchAdminOverview<
       TMembership
     >
   >("/api/admin/overview", { cache: "no-store", ...options });
+}
+
+export type SaveEmailTemplatePayload = {
+  subject: string;
+  body: string;
+};
+
+export async function saveEmailTemplate(
+  templateKey: string,
+  payload: SaveEmailTemplatePayload,
+  options: ApiRequestOptions = {},
+): Promise<EmailTemplate> {
+  const { headers, ...init } = options;
+  const mergedHeaders = new Headers(headers ?? {});
+  if (!mergedHeaders.has("Content-Type")) {
+    mergedHeaders.set("Content-Type", "application/json");
+  }
+
+  return fetchJson<EmailTemplate>(
+    `/api/admin/email-templates/${encodeURIComponent(templateKey)}`,
+    {
+      ...init,
+      method: "PUT",
+      body: JSON.stringify(payload),
+      headers: mergedHeaders,
+    },
+  );
 }
 
 type CandidateStartInvitationResponse = {

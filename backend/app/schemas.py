@@ -259,11 +259,17 @@ class AdminReviewComment(CamelModel):
 class AdminEmailTemplate(CamelModel):
     id: str
     org_id: str
+    key: Optional[str]
     name: str
     subject: Optional[str]
     body: Optional[str]
     description: Optional[str]
     updated_at: datetime
+
+
+class EmailTemplateUpsert(CamelModel):
+    subject: Optional[str]
+    body: Optional[str]
 
 
 class AdminOrgOverview(CamelModel):
