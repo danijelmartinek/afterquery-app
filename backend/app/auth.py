@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 import uuid
 from dataclasses import dataclass
@@ -25,6 +26,9 @@ from pydantic_settings import BaseSettings
 _DOTENV_PATH = find_dotenv(filename=".env", raise_error_if_not_found=False, usecwd=True)
 if _DOTENV_PATH:
     load_dotenv(_DOTENV_PATH)
+
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseAuthSettings(BaseSettings):
@@ -393,6 +397,9 @@ async def get_current_supabase_session(
     """FastAPI dependency that resolves the current Supabase session."""
 
     if not authorization:
+        logger.warning(
+            "Supabase auth failed: missing Authorization header for protected endpoint",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization header is missing",
@@ -400,6 +407,11 @@ async def get_current_supabase_session(
 
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
+        logger.warning(
+            "Supabase auth failed: invalid Authorization header format (scheme=%s, has_token=%s)",
+            scheme.lower(),
+            bool(token),
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization header must be a Bearer token",
@@ -408,6 +420,7 @@ async def get_current_supabase_session(
     try:
         session = await auth.get_session(token)
     except SupabaseAuthError as exc:
+        logger.warning("Supabase auth failed: %s", exc)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     return session
@@ -419,6 +432,10 @@ async def require_authenticated_session(
     """Ensure the Supabase session is active and not expired."""
 
     if session.is_expired:
+        logger.warning(
+            "Supabase auth failed: access token expired for user_id=%s",
+            session.user.id,
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Supabase session has expired")
     return session
 
@@ -431,6 +448,12 @@ def require_roles(*roles: str):
 
     async def dependency(session: SupabaseSession = Depends(require_authenticated_session)) -> SupabaseSession:
         if not session.user.has_any_role(roles):
+            logger.warning(
+                "Supabase auth failed: user_id=%s missing required role (required=%s, user_roles=%s)",
+                session.user.id,
+                roles,
+                session.user.roles,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action",
@@ -438,4 +461,3 @@ def require_roles(*roles: str):
         return session
 
     return dependency
-
