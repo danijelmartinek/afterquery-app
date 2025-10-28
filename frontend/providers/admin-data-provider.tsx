@@ -8,6 +8,7 @@ import {
   useMemo,
   useReducer,
   useState,
+  useRef,
 } from "react";
 import { fetchAdminOverview } from "../lib/api";
 import type {
@@ -112,6 +113,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [membership, setMembership] = useState<AdminMembership | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("loading");
   const [loadingState, setLoadingState] = useState<boolean>(true);
+  const hasInitializedRef = useRef(false);
 
   const { accessToken, loading: authLoading, user: supabaseUser, isConfigured } = useSupabaseAuth();
 
@@ -145,6 +147,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       setMembership(null);
       setWorkspaceStatus("loading");
       setLoadingState(false);
+      hasInitializedRef.current = false;
       return;
     }
 
@@ -155,12 +158,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       setMembership(null);
       setWorkspaceStatus("loading");
       setLoadingState(false);
+      hasInitializedRef.current = false;
       return;
     }
 
     let active = true;
     const controller = new AbortController();
-    setLoadingState(true);
+    if (!hasInitializedRef.current) {
+      setLoadingState(true);
+    }
 
     fetchAdminOverview<
       Assessment,
@@ -196,16 +202,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           : "ready";
         setWorkspaceStatus(status);
         setLoadingState(false);
+        hasInitializedRef.current = true;
       })
       .catch((error) => {
         if (!active) return;
         console.error("Failed to load admin overview", error);
-        dispatch({ type: "initialize", payload: createEmptyState() });
-        setCurrentAdmin(supabaseAdmin ?? null);
-        setOrg(null);
-        setMembership(null);
-        setWorkspaceStatus("needs_org");
-        setLoadingState(false);
+        if (!hasInitializedRef.current) {
+          dispatch({ type: "initialize", payload: createEmptyState() });
+          setCurrentAdmin(supabaseAdmin ?? null);
+          setOrg(null);
+          setMembership(null);
+          setWorkspaceStatus("needs_org");
+          setLoadingState(false);
+        }
       });
 
     return () => {

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Badge } from "../../../../../../components/ui/badge";
 import Link from "next/link";
 import { format } from "date-fns";
+import { useEffect, useState } from "react";
 
 export default function AssessmentDetailPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -20,6 +21,48 @@ export default function AssessmentDetailPage() {
   }
   const seed = state.seeds.find((item) => item.id === assessment.seedId);
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
+
+  const [origin, setOrigin] = useState<string | null>(null);
+  const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  function scheduleReset(inviteId: string) {
+    setTimeout(() => {
+      setCopyStates((prev) => {
+        if (!(inviteId in prev)) {
+          return prev;
+        }
+        const { [inviteId]: _, ...rest } = prev;
+        return rest;
+      });
+    }, 2000);
+  }
+
+  async function handleCopyInvite(inviteId: string, startLinkToken?: string | null) {
+    if (!origin || !startLinkToken) {
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
+      scheduleReset(inviteId);
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(`${origin}/candidates/${startLinkToken}`);
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "copied" }));
+      scheduleReset(inviteId);
+    } catch (copyError) {
+      console.error("Failed to copy invite link", copyError);
+      setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
+      scheduleReset(inviteId);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -84,19 +127,34 @@ export default function AssessmentDetailPage() {
         </CardHeader>
         <CardContent className="divide-y divide-zinc-100">
           {invites.map((invite) => (
-            <div key={invite.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div key={invite.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-zinc-900">{invite.candidateName}</p>
                 <p className="text-sm text-zinc-500">{invite.candidateEmail}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge className="capitalize">{invite.status}</Badge>
-                <p className="text-xs text-zinc-500">
-                  Sent {format(new Date(invite.sentAt), "MMM d, yyyy")}
-                </p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/app/review/${invite.id}`}>Review</Link>
-                </Button>
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-3">
+                  <Badge className="capitalize">{invite.status}</Badge>
+                  <p className="text-xs text-zinc-500">
+                    Sent {format(new Date(invite.sentAt), "MMM d, yyyy")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/app/review/${invite.id}`}>Review</Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
+                  >
+                    {copyStates[invite.id] === "copied"
+                      ? "Copied!"
+                      : copyStates[invite.id] === "error"
+                        ? "Copy failed"
+                        : "Copy invite link"}
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

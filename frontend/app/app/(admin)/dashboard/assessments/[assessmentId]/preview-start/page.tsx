@@ -98,7 +98,7 @@ export default function PreviewStartPage() {
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline">Send test email</Button>
-            <Button onClick={handleCopy} disabled={!inviteLink}>
+            <Button onClick={handleCopy}>
               {copyState === "copied" ? "Copied!" : copyState === "error" ? "Copy failed" : "Copy invite link"}
             </Button>
           </div>

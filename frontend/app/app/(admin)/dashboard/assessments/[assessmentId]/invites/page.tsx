@@ -187,7 +187,6 @@ export default function AssessmentInvitesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
-                      disabled={!invite.startLinkToken || !origin}
                     >
                       {copyStates[invite.id] === "copied"
                         ? "Copied!"
