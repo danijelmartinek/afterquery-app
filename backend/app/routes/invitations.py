@@ -135,3 +135,65 @@ async def get_invitation(
         expired_at=invitation.expired_at,
     )
 
+
+@router.post(
+    "/{invitation_id}/mark-submitted",
+    response_model=schemas.AdminInvitation,
+)
+async def mark_invitation_submitted(
+    invitation_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(
+        require_roles("authenticated", "service_role")
+    ),
+) -> schemas.AdminInvitation:
+    try:
+        invitation_uuid = uuid.UUID(invitation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid invitation id") from exc
+
+    result = await session.execute(
+        select(models.Invitation)
+        .options(selectinload(models.Invitation.assessment))
+        .where(models.Invitation.id == invitation_uuid)
+    )
+    invitation = result.scalar_one_or_none()
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    assessment = invitation.assessment
+    if assessment is None:
+        raise HTTPException(status_code=500, detail="Invitation missing assessment")
+
+    await require_org_membership_role(
+        session,
+        assessment.org_id,
+        current_session,
+        allowed_roles=("owner", "admin"),
+    )
+
+    status_changed = False
+    if invitation.status != models.InvitationStatus.submitted:
+        invitation.status = models.InvitationStatus.submitted
+        invitation.submitted_at = invitation.submitted_at or datetime.now(timezone.utc)
+        status_changed = True
+
+    if status_changed:
+        await session.commit()
+
+    await session.refresh(invitation)
+
+    return schemas.AdminInvitation(
+        id=str(invitation.id),
+        assessment_id=str(invitation.assessment_id),
+        candidate_email=invitation.candidate_email,
+        candidate_name=invitation.candidate_name,
+        status=invitation.status.value,
+        start_deadline=invitation.start_deadline,
+        complete_deadline=invitation.complete_deadline,
+        start_link_token=None,
+        sent_at=invitation.sent_at,
+        started_at=invitation.started_at,
+        submitted_at=invitation.submitted_at,
+    )
+

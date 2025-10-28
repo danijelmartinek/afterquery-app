@@ -10,10 +10,13 @@ import { Button } from "../../../../../components/ui/button";
 import { Badge } from "../../../../../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../../components/ui/tabs";
 import { Textarea } from "../../../../../components/ui/textarea";
+import { markInvitationSubmitted } from "../../../../../lib/api";
+import { useSupabaseAuth } from "../../../../../providers/supabase-provider";
 
 export default function ReviewWorkspacePage() {
   const params = useParams<{ invitationId: string }>();
   const { state, dispatch } = useAdminData();
+  const { accessToken } = useSupabaseAuth();
   const invitation = state.invitations.find((item) => item.id === params.invitationId);
 
   if (!invitation) {
@@ -33,12 +36,36 @@ export default function ReviewWorkspacePage() {
     return activeInvitation.sentAt;
   }, [activeInvitation.sentAt, activeInvitation.submittedAt, repo?.lastCommitAt]);
 
-  function handleMarkSubmitted() {
-    if (activeInvitation.status !== "submitted") {
+  const [markingSubmitted, setMarkingSubmitted] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
+
+  async function handleMarkSubmitted() {
+    if (activeInvitation.status === "submitted") {
+      return;
+    }
+
+    if (!accessToken) {
+      setMarkError("Sign in to update the submission status.");
+      return;
+    }
+
+    setMarkError(null);
+    setMarkingSubmitted(true);
+    try {
+      const updated = await markInvitationSubmitted(activeInvitation.id, { accessToken });
       dispatch({
         type: "updateInvitationStatus",
-        payload: { invitationId: activeInvitation.id, status: "submitted", submittedAt: new Date().toISOString() },
+        payload: {
+          invitationId: updated.id,
+          status: updated.status,
+          submittedAt: updated.submittedAt ?? undefined,
+        },
       });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update submission status.";
+      setMarkError(message);
+    } finally {
+      setMarkingSubmitted(false);
     }
   }
 
@@ -53,9 +80,11 @@ export default function ReviewWorkspacePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleMarkSubmitted}>
-            Mark submitted
-          </Button>
+          {activeInvitation.status !== "submitted" && (
+            <Button variant="outline" onClick={handleMarkSubmitted} disabled={markingSubmitted}>
+              {markingSubmitted ? "Marking..." : "Mark submitted"}
+            </Button>
+          )}
           {repo?.repoHtmlUrl && (
             <Button asChild>
               <Link href={repo.repoHtmlUrl} target="_blank">
@@ -65,6 +94,8 @@ export default function ReviewWorkspacePage() {
           )}
         </div>
       </div>
+
+      {markError && <p className="text-sm text-red-600">{markError}</p>}
 
       <Tabs defaultValue="summary">
         <TabsList>

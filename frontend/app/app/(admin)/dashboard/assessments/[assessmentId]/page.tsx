@@ -1,6 +1,6 @@
 "use client";
 
-import { notFound, useParams, useRouter } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useAdminData } from "../../../../../../providers/admin-data-provider";
 import { Button } from "../../../../../../components/ui/button";
@@ -13,7 +13,6 @@ import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../..
 
 export default function AssessmentDetailPage() {
   const params = useParams<{ assessmentId: string }>();
-  const router = useRouter();
   const { state } = useAdminData();
 
   const assessment = state.assessments.find((item) => item.id === params.assessmentId);
@@ -77,9 +76,6 @@ export default function AssessmentDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push(`/app/dashboard/assessments/${assessment.id}/preview-start`)}>
-            Preview start page
-          </Button>
           <Button asChild>
             <Link href={`/app/dashboard/assessments/${assessment.id}/invites`}>Manage invites</Link>
           </Button>
