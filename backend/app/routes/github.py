@@ -9,16 +9,14 @@ from urllib.parse import urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 from ..github_app import GitHubAppError, get_github_app_client, get_github_app_settings
-from ..services.github_installations import (
-    github_installation_to_schema,
-    get_github_installation,
-)
+from ..services.github_installations import github_installation_to_schema
 from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/github", tags=["github"])
@@ -225,30 +223,32 @@ async def complete_github_installation(
     account_html_url = account.get("html_url")
     installation_html_url = installation_payload.get("html_url")
 
-    existing_installation = await get_github_installation(session, org_id)
-    if existing_installation is None:
-        installation_model = models.GitHubInstallation(
-            org_id=org_id,
-            installation_id=payload.installation_id,
-            target_type=target_type,
-            account_login=account_login,
-            account_id=account_id,
-            account_avatar_url=account_avatar_url,
-            account_html_url=account_html_url,
-            installation_html_url=installation_html_url,
+    upsert_values = {
+        "org_id": org_id,
+        "installation_id": payload.installation_id,
+        "target_type": target_type,
+        "account_login": account_login,
+        "account_id": account_id,
+        "account_avatar_url": account_avatar_url,
+        "account_html_url": account_html_url,
+        "installation_html_url": installation_html_url,
+        "updated_at": now,
+    }
+
+    update_values = {key: value for key, value in upsert_values.items() if key != "org_id"}
+
+    insert_stmt = (
+        pg_insert(models.GitHubInstallation)
+        .values(**upsert_values)
+        .on_conflict_do_update(
+            index_elements=[models.GitHubInstallation.org_id],
+            set_=update_values,
         )
-        installation_model.updated_at = now
-        session.add(installation_model)
-    else:
-        installation_model = existing_installation
-        installation_model.installation_id = payload.installation_id
-        installation_model.target_type = target_type
-        installation_model.account_login = account_login
-        installation_model.account_id = account_id
-        installation_model.account_avatar_url = account_avatar_url
-        installation_model.account_html_url = account_html_url
-        installation_model.installation_html_url = installation_html_url
-        installation_model.updated_at = now
+        .returning(models.GitHubInstallation)
+    )
+
+    result = await session.execute(insert_stmt)
+    installation_model = result.scalar_one()
 
     return_path = _normalize_return_path(state.return_path)
 
