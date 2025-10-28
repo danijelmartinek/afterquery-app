@@ -4,6 +4,7 @@ __all__ = [
     "admin",
     "assessments",
     "candidate",
+    "github",
     "invitations",
     "orgs",
     "seeds",

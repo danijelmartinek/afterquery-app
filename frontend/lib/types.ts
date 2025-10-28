@@ -134,6 +134,16 @@ export type OrgProfile = {
   slug: string;
 };
 
+export type GitHubInstallation = {
+  connected: boolean;
+  installationId: number | null;
+  accountLogin: string | null;
+  accountHtmlUrl: string | null;
+  installationHtmlUrl: string | null;
+  targetType: string | null;
+  connectedAt: string | null;
+};
+
 export type EmailTemplate = {
   id: string;
   orgId: string;

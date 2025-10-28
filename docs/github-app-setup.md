@@ -37,7 +37,7 @@ app, capture its credentials, and wire it into the Afterquery backend.
    sure the app is installed on any private starter repositories you plan to
    mirror so the import step can clone their contents.
 3. After installation note the URL – the numeric segment at the end is the
-   `installation_id` required by the API (for example `/installations/12345678`).
+   administrators can initiate the installation from the Afterquery dashboard; the callback captures the installation details automatically.
 
 ## 3. Configure environment variables
 
@@ -48,15 +48,16 @@ local `.env` file):
 GITHUB_APP_ID=123456
 # Paste the PEM contents or a base64/\n escaped version – the backend normalises the value.
 GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GITHUB_APP_INSTALLATION_ID=12345678
-GITHUB_ORG=your-company
+GITHUB_APP_SLUG=your-app-slug
 # Optional overrides
 # GITHUB_API_BASE_URL=https://api.github.com
 # GITHUB_SEED_PREFIX=afterquery-seed
 # GITHUB_CANDIDATE_PREFIX=afterquery-candidate
 ```
 
-Install the backend dependencies to ensure the GitHub App helper can mint
+Install the backend dependenciesAdministrators can trigger the GitHub App installation from the Afterquery dashboard when adding a seed repository. The FastAPI callback stores the installation metadata in the project record so no manual copying of installation ids is required.
+
+ to ensure the GitHub App helper can mint
 RS256-signed tokens:
 
 ```bash
@@ -82,26 +83,7 @@ curl -H "Authorization: Bearer <SUPABASE_SERVICE_TOKEN>" \
   "http://localhost:8000/api/seeds" # create a seed from the UI afterwards
 ```
 
-You can also hit the GitHub API directly using the app credentials:
-
-```bash
-python - <<'PY'
-from backend.app.github_app import get_github_app_client
-import asyncio
-
-async def main():
-    client = get_github_app_client()
-    token, expires = await client._create_installation_access_token()  # noqa: SLF001
-    print("Token expires at", expires)
-
-asyncio.run(main())
-PY
-```
-
-The helper should mint a token valid for approximately one hour. Seeds and
-candidate repositories are created inside `GITHUB_ORG` using the configurable
-prefixes, and the backend automatically marks the seed repository as a private
-template with the `main` default branch.
+Seeds and candidate repositories are created inside the connected GitHub organization using the configurable prefixes, and the backend automatically marks the seed repository as a private template with the `main` default branch once the installation is complete.
 
 ## 5. Optional: branch protection & webhooks
 

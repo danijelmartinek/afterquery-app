@@ -38,8 +38,7 @@ class GitHubAppSettings(BaseSettings):
 
     app_id: str = Field(..., alias="github_app_id", env="GITHUB_APP_ID")
     private_key: str = Field(..., alias="github_app_private_key", env="GITHUB_APP_PRIVATE_KEY")
-    installation_id: int = Field(..., alias="github_app_installation_id", env="GITHUB_APP_INSTALLATION_ID")
-    organization: str = Field(..., alias="github_org", env="GITHUB_ORG")
+    app_slug: str = Field(..., alias="github_app_slug", env="GITHUB_APP_SLUG")
     api_base_url: str = Field("https://api.github.com", env="GITHUB_API_BASE_URL")
     request_timeout_seconds: float = Field(15.0, env="GITHUB_HTTP_TIMEOUT_SECONDS")
     seed_repo_prefix: str = Field("afterquery-seed", env="GITHUB_SEED_PREFIX")
@@ -118,9 +117,18 @@ def _parse_repo_identifier(source: str) -> tuple[str, str]:
 class GitHubAppClient:
     """Lightweight wrapper for GitHub App installation interactions."""
 
-    def __init__(self, settings: GitHubAppSettings) -> None:
+    def __init__(
+        self,
+        settings: GitHubAppSettings,
+        *,
+        installation_id: Optional[int] = None,
+        organization: Optional[str] = None,
+        private_key: Optional[str] = None,
+    ) -> None:
         self._settings = settings
-        self._private_key = settings.normalized_private_key()
+        self._installation_id = installation_id
+        self._organization = organization
+        self._private_key = private_key or settings.normalized_private_key()
         self._app_jwt: Optional[str] = None
         self._app_jwt_expires_at: float = 0.0
         self._installation_token: Optional[str] = None
@@ -128,7 +136,26 @@ class GitHubAppClient:
 
     @property
     def organization(self) -> str:
-        return self._settings.organization
+        if not self._organization:
+            raise RuntimeError("GitHub App organization is not configured")
+        return self._organization
+
+    @property
+    def installation_id(self) -> int:
+        if self._installation_id is None:
+            raise RuntimeError("GitHub App installation is not configured")
+        return self._installation_id
+
+    def with_installation(self, installation_id: int, organization: str) -> "GitHubAppClient":
+        client = GitHubAppClient(
+            self._settings,
+            installation_id=installation_id,
+            organization=organization,
+            private_key=self._private_key,
+        )
+        client._app_jwt = self._app_jwt
+        client._app_jwt_expires_at = self._app_jwt_expires_at
+        return client
 
     async def _request(
         self,
@@ -270,7 +297,7 @@ class GitHubAppClient:
             response = await self._request(
                 client,
                 "POST",
-                f"/app/installations/{self._settings.installation_id}/access_tokens",
+                f"/app/installations/{self.installation_id}/access_tokens",
                 token=app_jwt,
                 token_is_app=True,
                 json=payload or None,
@@ -479,6 +506,22 @@ class GitHubAppClient:
             await client.patch(
                 f"/repos/{repo_full_name}", json={"archived": True, "default_branch": "main"}
             )
+
+    async def fetch_installation(self, installation_id: Optional[int] = None) -> dict[str, Any]:
+        target_id = installation_id if installation_id is not None else self.installation_id
+        app_jwt = await self._get_app_jwt()
+        async with httpx.AsyncClient(
+            base_url=self._settings.api_base_url,
+            timeout=self._settings.request_timeout_seconds,
+        ) as client:
+            response = await self._request(
+                client,
+                "GET",
+                f"/app/installations/{target_id}",
+                token=app_jwt,
+                token_is_app=True,
+            )
+        return response.json()
 
 
 @lru_cache

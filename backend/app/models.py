@@ -70,6 +70,9 @@ class Org(Base, TimestampMixin):
     members: Mapped[list["OrgMember"]] = relationship(back_populates="org")
     seeds: Mapped[list["Seed"]] = relationship(back_populates="org")
     email_templates: Mapped[list["EmailTemplate"]] = relationship(back_populates="org")
+    github_installation: Mapped[Optional["GitHubInstallation"]] = relationship(
+        back_populates="org", uselist=False
+    )
 
 class OrgMember(Base, TimestampMixin):
     __tablename__ = "org_members"
@@ -88,6 +91,44 @@ class OrgMember(Base, TimestampMixin):
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     org: Mapped[Org] = relationship(back_populates="members")
+
+
+class GitHubInstallation(Base, TimestampMixin):
+    __tablename__ = "github_installations"
+    __table_args__ = (
+        UniqueConstraint("installation_id", name="uq_github_installation_id"),
+    )
+
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("orgs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    installation_id: Mapped[int] = mapped_column(BIGINT, nullable=False)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)
+    account_login: Mapped[str] = mapped_column(String, nullable=False)
+    account_id: Mapped[int] = mapped_column(BIGINT, nullable=False)
+    account_avatar_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    account_html_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    installation_html_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    org: Mapped[Org] = relationship(back_populates="github_installation")
+
+
+class GitHubInstallationState(Base, TimestampMixin):
+    __tablename__ = "github_installation_states"
+    __table_args__ = (Index("idx_github_installation_states_org_id", "org_id"),)
+
+    token: Mapped[str] = mapped_column(String, primary_key=True)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    org: Mapped[Org] = relationship()
 
 
 class Seed(Base, TimestampMixin):

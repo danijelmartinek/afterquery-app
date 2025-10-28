@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .. import models, schemas, utils
+from ..services.github_installations import github_installation_to_schema
 from ..services.email import (
     CANDIDATE_ASSESSMENT_STARTED_TEMPLATE_KEY,
     CANDIDATE_ASSESSMENT_SUBMITTED_TEMPLATE_KEY,
@@ -422,6 +423,7 @@ async def _fetch_org(
         .options(
             selectinload(models.Org.members),
             selectinload(models.Org.seeds),
+            selectinload(models.Org.github_installation),
         )
         .order_by(models.Org.created_at)
     )
@@ -582,6 +584,7 @@ async def _build_admin_overview(
             _email_template_to_schema(template)
             for template in templates
         ],
+        github_installation=github_installation_to_schema(org.github_installation),
     )
 
 
@@ -606,6 +609,9 @@ def _empty_admin_overview(
         candidate_repos=[],
         review_comments=[],
         email_templates=[],
+        github_installation=github_installation_to_schema(
+            org.github_installation if org is not None else None
+        ),
     )
 
 
