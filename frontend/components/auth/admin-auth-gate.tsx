@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSupabaseAuth } from "../../providers/supabase-provider";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
 
 export function AdminAuthGate({ children }: { children: ReactNode }) {
   const { session, loading, isConfigured } = useSupabaseAuth();

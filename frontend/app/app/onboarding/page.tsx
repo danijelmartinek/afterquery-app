@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AdminAuthGate } from "../../../components/auth/admin-auth-gate";
-import { Button } from "../../../components/ui/button";
-import { useSupabaseAuth } from "../../../providers/supabase-provider";
-import { fetchAdminOverview } from "../../../lib/api";
+import { AdminAuthGate } from "@/components/auth/admin-auth-gate";
+import { Button } from "@/components/ui/button";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
+import { fetchAdminOverview } from "@/lib/api";
 
 export default function OnboardingPage() {
   const router = useRouter();

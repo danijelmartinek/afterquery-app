@@ -2,21 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { saveEmailTemplate } from "../../../../../lib/api";
-import type { EmailTemplate } from "../../../../../lib/types";
-import { useAdminData } from "../../../../../providers/admin-data-provider";
-import { useSupabaseAuth } from "../../../../../providers/supabase-provider";
+import { saveEmailTemplate } from "@/lib/api";
+import type { EmailTemplate } from "@/lib/types";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../../../../../components/ui/card";
-import { Label } from "../../../../../components/ui/label";
-import { Input } from "../../../../../components/ui/input";
-import { Textarea } from "../../../../../components/ui/textarea";
-import { Button } from "../../../../../components/ui/button";
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 const TEMPLATE_CONFIGS = [
   {

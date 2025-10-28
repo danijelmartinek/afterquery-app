@@ -10,7 +10,7 @@ import {
   useState,
   useRef,
 } from "react";
-import { fetchAdminOverview } from "../lib/api";
+import { fetchAdminOverview } from "@/lib/api";
 import type {
   Assessment,
   CandidateRepo,
@@ -21,7 +21,7 @@ import type {
   AdminUser,
   OrgProfile,
   AdminMembership,
-} from "../lib/types";
+} from "@/lib/types";
 import { useSupabaseAuth } from "./supabase-provider";
 
 type AdminDataState = {

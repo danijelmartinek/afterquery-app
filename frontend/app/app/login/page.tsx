@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "../../../components/ui/button";
-import { useSupabaseAuth } from "../../../providers/supabase-provider";
-import { fetchAdminOverview } from "../../../lib/api";
+import { Button } from "@/components/ui/button";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
+import { fetchAdminOverview } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();

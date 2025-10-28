@@ -1,11 +1,11 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { useAdminData } from "../../../../providers/admin-data-provider";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
-import { Button } from "../../../../components/ui/button";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Badge } from "../../../../components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 
 export default function DashboardPage() {
   const { state } = useAdminData();

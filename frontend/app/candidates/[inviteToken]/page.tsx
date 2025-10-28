@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { CandidateStartView } from "../../../components/candidate/candidate-start-view";
-import { fetchCandidateStart } from "../../../lib/api";
+import { CandidateStartView } from "@/components/candidate/candidate-start-view";
+import { fetchCandidateStart } from "@/lib/api";
 
 export default async function CandidateStartPage({
   params,

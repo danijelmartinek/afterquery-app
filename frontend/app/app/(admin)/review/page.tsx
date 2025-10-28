@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useAdminData } from "../../../../providers/admin-data-provider";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
-import { Badge } from "../../../../components/ui/badge";
-import { Button } from "../../../../components/ui/button";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 
 export default function ReviewQueuePage() {

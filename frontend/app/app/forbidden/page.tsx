@@ -1,8 +1,8 @@
 "use client";
 
-import { AdminAuthGate } from "../../../components/auth/admin-auth-gate";
-import { Button } from "../../../components/ui/button";
-import { useSupabaseAuth } from "../../../providers/supabase-provider";
+import { AdminAuthGate } from "@/components/auth/admin-auth-gate";
+import { Button } from "@/components/ui/button";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
 
 export default function ForbiddenPage() {
   const { signOut, user } = useSupabaseAuth();
