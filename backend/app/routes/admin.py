@@ -256,7 +256,6 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
 @router.post("/bootstrap", response_model=schemas.BootstrapResponse)
 async def bootstrap_database(
     session: AsyncSession = Depends(get_session),
-    current_session: SupabaseSession = Depends(require_roles("service_role", "admin")),
 ) -> schemas.BootstrapResponse:
     """Apply database schema migrations and seed initial demo data."""
 
