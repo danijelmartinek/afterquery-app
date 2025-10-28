@@ -409,7 +409,7 @@ export async function createSeed(payload: CreateSeedPayload, options: ApiRequest
 }
 
 type GitHubInstallationStartResponse = {
-  installation_url: string;
+  installationUrl: string;
 };
 
 export async function startGitHubInstallation(
@@ -429,7 +429,7 @@ export async function startGitHubInstallation(
     },
   );
 
-  return response.installation_url;
+  return response.installationUrl;
 }
 
 export async function completeGitHubInstallation(
