@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models, schemas
+from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 
 router = APIRouter(prefix="/api/seeds", tags=["seeds"])
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/api/seeds", tags=["seeds"])
 
 @router.post("", response_model=schemas.SeedRead, status_code=201)
 async def create_seed(
-    payload: schemas.SeedCreate, session: AsyncSession = Depends(get_session)
+    payload: schemas.SeedCreate,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
 ) -> schemas.SeedRead:
     try:
         org_id = uuid.UUID(payload.org_id)
@@ -42,7 +45,13 @@ async def create_seed(
 
 
 @router.get("/{seed_id}", response_model=schemas.SeedRead)
-async def get_seed(seed_id: str, session: AsyncSession = Depends(get_session)) -> schemas.SeedRead:
+async def get_seed(
+    seed_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(
+        require_roles("owner", "admin", "viewer", "service_role")
+    ),
+) -> schemas.SeedRead:
     try:
         seed_uuid = uuid.UUID(seed_id)
     except ValueError as exc:

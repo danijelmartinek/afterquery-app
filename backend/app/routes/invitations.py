@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .. import models, schemas
+from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 from ..utils import generate_token, hash_token
 
@@ -33,7 +34,9 @@ async def _load_assessment(
 
 @router.post("", response_model=list[schemas.InvitationRead], status_code=201)
 async def create_invitations(
-    payload: schemas.InvitationBatchCreate, session: AsyncSession = Depends(get_session)
+    payload: schemas.InvitationBatchCreate,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
 ) -> list[schemas.InvitationRead]:
     try:
         assessment_id = uuid.UUID(payload.assessment_id)
@@ -78,7 +81,11 @@ async def create_invitations(
 
 @router.get("/{invitation_id}", response_model=schemas.InvitationDetail)
 async def get_invitation(
-    invitation_id: str, session: AsyncSession = Depends(get_session)
+    invitation_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(
+        require_roles("owner", "admin", "viewer", "service_role")
+    ),
 ) -> schemas.InvitationDetail:
     try:
         invitation_uuid = uuid.UUID(invitation_id)
