@@ -18,9 +18,6 @@ export default function LandingPage() {
         <Button asChild>
           <Link href="/app/login">Sign in as admin</Link>
         </Button>
-        <Button variant="outline" asChild>
-          <Link href="/candidates/sample-invite">Preview candidate start page</Link>
-        </Button>
       </div>
     </div>
   );
