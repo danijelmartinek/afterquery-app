@@ -8,6 +8,27 @@ from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
+class SeedSummary(BaseModel):
+    created_org: bool
+    org_id: str
+    created_user: bool
+    user_id: str
+    created_membership: bool
+    created_seed: bool
+    seed_id: str
+    created_assessment: bool
+    assessment_id: str
+    created_invitation: bool
+    invitation_id: Optional[str]
+    invitation_start_token: Optional[str]
+
+
+class BootstrapResponse(BaseModel):
+    migrated: bool
+    schema_path: str
+    seed: SeedSummary
+
+
 class OrgCreate(BaseModel):
     name: str
 

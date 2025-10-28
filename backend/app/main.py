@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import lifespan
-from .routes import assessments, candidate, invitations, orgs, seeds
+from .routes import admin, assessments, candidate, invitations, orgs, seeds
 
 app = FastAPI(title="Backend API", lifespan=lifespan)
 
@@ -16,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin.router)
 app.include_router(orgs.router)
 app.include_router(seeds.router)
 app.include_router(assessments.router)
