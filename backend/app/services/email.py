@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import uuid
 import logging
 import os
 from dataclasses import dataclass
@@ -12,7 +13,8 @@ from typing import Mapping, Optional, Sequence
 
 import httpx
 from dotenv import find_dotenv, load_dotenv
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models
@@ -155,6 +157,8 @@ class ResendEmailService:
 
     def __init__(self, settings: ResendSettings) -> None:
         self._settings = settings
+        self._candidate_status_event_types_supported: Optional[bool] = None
+        self._candidate_status_constraint_warning_logged = False
 
     def _build_from_header(self) -> str:
         if self._settings.from_name:
@@ -308,15 +312,14 @@ class ResendEmailService:
 
         invitation.sent_at = datetime.now(timezone.utc)
 
-        email_event = models.EmailEvent(
+        await self._record_email_event(
+            session,
             invitation_id=invitation.id,
-            type=models.EmailEventType.invite,
+            event_type=models.EmailEventType.invite,
             provider_id=provider_id,
             to_email=invitation.candidate_email,
             status=data.get("status") if isinstance(data.get("status"), str) else "sent",
         )
-        session.add(email_event)
-        await session.flush()
 
     async def send_candidate_status_email(
         self,
@@ -367,16 +370,82 @@ class ResendEmailService:
         )
         provider_id = str(data.get("id")) if data.get("id") is not None else None
 
-        email_event = models.EmailEvent(
+        await self._record_email_event(
+            session,
             invitation_id=invitation.id,
-            type=event_type,
+            event_type=event_type,
             provider_id=provider_id,
             to_email=invitation.candidate_email,
             status=data.get("status") if isinstance(data.get("status"), str) else "sent",
         )
+        return True
+
+    async def _record_email_event(
+        self,
+        session: AsyncSession,
+        *,
+        invitation_id: uuid.UUID,
+        event_type: models.EmailEventType,
+        provider_id: Optional[str],
+        to_email: str,
+        status: str,
+    ) -> None:
+        stored_type = await self._resolve_email_event_type(session, event_type)
+        email_event = models.EmailEvent(
+            invitation_id=invitation_id,
+            type=stored_type,
+            provider_id=provider_id,
+            to_email=to_email,
+            status=status,
+        )
         session.add(email_event)
         await session.flush()
-        return True
+
+    async def _resolve_email_event_type(
+        self, session: AsyncSession, event_type: models.EmailEventType
+    ) -> Optional[models.EmailEventType]:
+        if event_type not in _STATUS_TEMPLATE_CONFIG:
+            return event_type
+        if await self._supports_candidate_status_event_types(session):
+            return event_type
+        if not self._candidate_status_constraint_warning_logged:
+            logger.warning(
+                "email_events.type check constraint is missing candidate status values; "
+                "storing %s email events without a type. "
+                "Run `ALTER TABLE email_events DROP CONSTRAINT email_events_type_check; "
+                "ALTER TABLE email_events ADD CONSTRAINT email_events_type_check CHECK "
+                "(type IN ('invite','reminder','follow_up','assessment_started','submission_received'));`",
+                event_type.value,
+            )
+            self._candidate_status_constraint_warning_logged = True
+        return None
+
+    async def _supports_candidate_status_event_types(self, session: AsyncSession) -> bool:
+        if self._candidate_status_event_types_supported is not None:
+            return self._candidate_status_event_types_supported
+
+        constraint_def: Optional[str] = None
+        try:
+            result = await session.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) AS definition "
+                    "FROM pg_constraint WHERE conname = 'email_events_type_check'"
+                )
+            )
+            constraint_def = result.scalar_one_or_none()
+        except SQLAlchemyError:
+            logger.exception(
+                "Failed to inspect email_events_type_check constraint; assuming candidate status "
+                "email event types are unsupported"
+            )
+
+        supported = False
+        if constraint_def:
+            required_tokens = ("'assessment_started'", "'submission_received'")
+            supported = all(token in constraint_def for token in required_tokens)
+
+        self._candidate_status_event_types_supported = supported
+        return supported
 
 
 @lru_cache
