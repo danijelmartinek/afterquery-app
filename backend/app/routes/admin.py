@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from .. import models, schemas, utils
 from ..auth import SupabaseSession, require_roles
 from ..database import ASYNC_ENGINE, get_session
+from ..services.supabase_users import ensure_supabase_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -365,8 +366,19 @@ async def _build_admin_overview(
     )
     current_admin: Optional[schemas.AdminUser] = None
     chosen_membership: Optional[models.OrgMember] = None
+    db_user = None
     if supabase_session is not None:
-        chosen_membership = _find_membership_for_email(org, supabase_session.user.email)
+        db_user = await ensure_supabase_user(session, supabase_session)
+        chosen_membership = next(
+            (
+                membership
+                for membership in org.members
+                if membership.user_id == db_user.id
+            ),
+            None,
+        )
+        if chosen_membership is None:
+            chosen_membership = _find_membership_for_email(org, supabase_session.user.email)
     if chosen_membership is None and memberships:
         chosen_membership = memberships[0]
 
@@ -378,21 +390,13 @@ async def _build_admin_overview(
             name=user.name or user.email,
             role=chosen_membership.role,
         )
-    elif supabase_session is not None:
-        metadata = supabase_session.user.user_metadata or {}
-        derived_name = None
-        for key in ("full_name", "name"):
-            candidate = metadata.get(key)
-            if isinstance(candidate, str) and candidate.strip():
-                derived_name = candidate.strip()
-                break
-        if derived_name is None:
-            derived_name = supabase_session.user.email or str(supabase_session.user.id)
+    elif db_user is not None:
+        derived_name = db_user.name or db_user.email or str(db_user.id)
         current_admin = schemas.AdminUser(
-            id=str(supabase_session.user.id),
-            email=supabase_session.user.email,
+            id=str(db_user.id),
+            email=db_user.email,
             name=derived_name,
-            role=supabase_session.user.role,
+            role=supabase_session.user.role if supabase_session else None,
         )
 
     seeds = sorted(org.seeds, key=lambda seed: seed.created_at, reverse=True)
