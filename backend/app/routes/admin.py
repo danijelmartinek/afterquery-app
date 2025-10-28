@@ -285,7 +285,7 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
             candidate_email_body=demo_candidate_email_body,
             time_to_start=demo_time_to_start,
             time_to_complete=demo_time_to_complete,
-            created_by=user.id,
+            created_by=owner_supabase_id,
         )
         session.add(assessment)
         await session.flush()
