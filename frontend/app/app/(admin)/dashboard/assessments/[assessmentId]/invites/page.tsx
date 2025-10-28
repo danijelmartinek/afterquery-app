@@ -62,7 +62,21 @@ export default function AssessmentInvitesPage() {
         ],
         { accessToken },
       );
-      created.forEach((invite) => dispatch({ type: "createInvitation", payload: invite }));
+      const linkBase =
+        runtimeOrigin ?? (typeof window !== "undefined" ? window.location.origin : null);
+      created.forEach((invite) => {
+        dispatch({ type: "createInvitation", payload: invite });
+        const inviteLink = buildCandidateStartLink(invite.startLinkToken, linkBase);
+        if (inviteLink) {
+          console.log(
+            `[afterquery] Invitation ready for ${invite.candidateEmail} – share ${inviteLink} with the candidate.`,
+          );
+        } else {
+          console.log(
+            `[afterquery] Invitation ready for ${invite.candidateEmail} – start link unavailable in response.`,
+          );
+        }
+      });
       setFormState({ candidateName: "", candidateEmail: "" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create invitation";
@@ -118,7 +132,10 @@ export default function AssessmentInvitesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">New invitation</CardTitle>
-          <CardDescription>Generating an invite will email the candidate instantly.</CardDescription>
+          <CardDescription>
+            While email delivery is wiring up, new invites log the candidate link to the developer
+            console.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateInvite} className="grid gap-4 md:grid-cols-2">
