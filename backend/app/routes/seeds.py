@@ -22,10 +22,7 @@ async def create_seed(
     session: AsyncSession = Depends(get_session),
     current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> schemas.SeedRead:
-    try:
-        org_id = uuid.UUID(payload.org_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid org id") from exc
+    org_id = payload.org_id
 
     org_result = await session.execute(select(models.Org).where(models.Org.id == org_id))
     if org_result.scalar_one_or_none() is None:

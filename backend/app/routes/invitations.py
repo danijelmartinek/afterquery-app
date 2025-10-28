@@ -39,10 +39,7 @@ async def create_invitations(
     session: AsyncSession = Depends(get_session),
     current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> list[schemas.InvitationRead]:
-    try:
-        assessment_id = uuid.UUID(payload.assessment_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid assessment id") from exc
+    assessment_id = payload.assessment_id
 
     assessment = await _load_assessment(session, assessment_id)
 

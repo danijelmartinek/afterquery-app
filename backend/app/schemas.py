@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
@@ -52,14 +53,14 @@ class OrgCreate(BaseModel):
 
 
 class OrgRead(OrgCreate):
-    id: str = Field(..., description="Org UUID")
+    id: UUID = Field(..., description="Org UUID")
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class SeedCreate(BaseModel):
-    org_id: str
+    org_id: UUID
     source_repo_url: str
     seed_repo_full_name: str
     default_branch: str = "main"
@@ -68,15 +69,15 @@ class SeedCreate(BaseModel):
 
 
 class SeedRead(SeedCreate):
-    id: str
+    id: UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class AssessmentCreate(BaseModel):
-    org_id: str
-    seed_id: str
+    org_id: UUID
+    seed_id: UUID
     title: str
     description: Optional[str]
     instructions: Optional[str]
@@ -84,11 +85,11 @@ class AssessmentCreate(BaseModel):
     candidate_email_body: Optional[str]
     time_to_start: timedelta
     time_to_complete: timedelta
-    created_by: Optional[str]
+    created_by: Optional[UUID]
 
 
 class AssessmentRead(AssessmentCreate):
-    id: str
+    id: UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -100,13 +101,13 @@ class InvitationCreate(BaseModel):
 
 
 class InvitationBatchCreate(BaseModel):
-    assessment_id: str
+    assessment_id: UUID
     invitations: List[InvitationCreate]
 
 
 class InvitationRead(BaseModel):
-    id: str
-    assessment_id: str
+    id: UUID
+    assessment_id: UUID
     candidate_email: EmailStr
     candidate_name: Optional[str]
     status: str
@@ -119,8 +120,8 @@ class InvitationRead(BaseModel):
 
 
 class CandidateRepoRead(BaseModel):
-    id: str
-    invitation_id: str
+    id: UUID
+    invitation_id: UUID
     seed_sha_pinned: str
     repo_full_name: str
     repo_html_url: Optional[str]
@@ -133,7 +134,7 @@ class CandidateRepoRead(BaseModel):
 
 
 class StartAssessmentResponse(BaseModel):
-    invitation_id: str
+    invitation_id: UUID
     candidate_repo: CandidateRepoRead
     access_token: str = Field(..., description="Opaque token presented to the git credential broker")
     access_token_expires_at: datetime
@@ -145,15 +146,15 @@ class SubmitRequest(BaseModel):
 
 
 class SubmitResponse(BaseModel):
-    invitation_id: str
-    submission_id: str
+    invitation_id: UUID
+    submission_id: UUID
     final_sha: str
     submitted_at: datetime
 
 
 class InvitationDetail(BaseModel):
-    id: str
-    assessment_id: str
+    id: UUID
+    assessment_id: UUID
     candidate_email: EmailStr
     candidate_name: Optional[str]
     status: str
