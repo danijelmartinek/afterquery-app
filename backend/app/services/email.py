@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import html
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Sequence
 
 import httpx
 from dotenv import find_dotenv, load_dotenv
-from pydantic import Field, ValidationError
-from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models
@@ -24,53 +23,94 @@ if _DOTENV_PATH:
     load_dotenv(_DOTENV_PATH)
 
 
-_MISSING_ENVIRONMENT_HINTS: Mapping[str, str] = {
-    "api_key": "RESEND_API_KEY",
-    "from_email": "RESEND_FROM_EMAIL",
-    "from_name": "RESEND_FROM_NAME",
-    "reply_to_email": "RESEND_REPLY_TO_EMAIL",
-    "candidate_app_url": "CANDIDATE_APP_URL or NEXT_PUBLIC_CANDIDATE_APP_URL",
-    "api_base_url": "RESEND_API_BASE_URL",
-    "request_timeout_seconds": "RESEND_HTTP_TIMEOUT_SECONDS",
-}
-
-
-class ResendSettings(BaseSettings):
+@dataclass(frozen=True, slots=True)
+class ResendSettings:
     """Configuration required to send transactional email via Resend."""
 
-    api_key: str = Field(..., env="RESEND_API_KEY")
-    from_email: str = Field(..., env="RESEND_FROM_EMAIL")
-    from_name: Optional[str] = Field(None, env="RESEND_FROM_NAME")
-    reply_to_email: Optional[str] = Field(None, env="RESEND_REPLY_TO_EMAIL")
-    candidate_app_url: str = Field(
-        ...,
-        env=("CANDIDATE_APP_URL", "NEXT_PUBLIC_CANDIDATE_APP_URL"),
-    )
-    api_base_url: str = Field("https://api.resend.com", env="RESEND_API_BASE_URL")
-    request_timeout_seconds: float = Field(10.0, env="RESEND_HTTP_TIMEOUT_SECONDS")
+    api_key: str
+    from_email: str
+    candidate_app_url: str
+    from_name: Optional[str] = None
+    reply_to_email: Optional[str] = None
+    api_base_url: str = "https://api.resend.com"
+    request_timeout_seconds: float = 10.0
 
     @property
     def normalized_candidate_base(self) -> str:
         return self.candidate_app_url.rstrip("/")
 
 
+_REQUIRED_ENVIRONMENT_KEYS: Mapping[str, Sequence[str]] = {
+    "api_key": ("RESEND_API_KEY",),
+    "from_email": ("RESEND_FROM_EMAIL",),
+    "candidate_app_url": ("CANDIDATE_APP_URL", "NEXT_PUBLIC_CANDIDATE_APP_URL"),
+}
+
+_OPTIONAL_ENVIRONMENT_KEYS: Mapping[str, Sequence[str]] = {
+    "from_name": ("RESEND_FROM_NAME",),
+    "reply_to_email": ("RESEND_REPLY_TO_EMAIL",),
+    "api_base_url": ("RESEND_API_BASE_URL",),
+    "request_timeout_seconds": ("RESEND_HTTP_TIMEOUT_SECONDS",),
+}
+
+
+def _read_first_env(names: Sequence[str]) -> Optional[str]:
+    for env_name in names:
+        value = os.getenv(env_name)
+        if value is not None and value.strip() != "":
+            return value
+    return None
+
+
+def _build_missing_env_message(missing: list[str]) -> str:
+    detail = "Resend environment variables are not configured"
+    if missing:
+        detail = f"{detail}: missing {', '.join(missing)}"
+    return detail
+
+
 @lru_cache
 def get_resend_settings() -> ResendSettings:
-    try:
-        return ResendSettings()
-    except ValidationError as exc:  # pragma: no cover - configuration error
-        missing_names: list[str] = []
-        for error in exc.errors():
-            if error.get("type") != "missing":
-                continue
-            field_name = str(error.get("loc", ("?",))[0])
-            env_name = _MISSING_ENVIRONMENT_HINTS.get(field_name, field_name)
-            missing_names.append(env_name)
-        missing = ", ".join(missing_names)
-        detail = "Resend environment variables are not configured"
-        if missing:
-            detail = f"{detail}: missing {missing}"
-        raise RuntimeError(detail) from exc
+    values: dict[str, str] = {}
+    missing: list[str] = []
+
+    for field_name, env_names in _REQUIRED_ENVIRONMENT_KEYS.items():
+        value = _read_first_env(env_names)
+        if value is None:
+            missing.append(" or ".join(env_names))
+            continue
+        values[field_name] = value
+
+    if missing:  # pragma: no cover - configuration error
+        raise RuntimeError(_build_missing_env_message(missing))
+
+    for field_name, env_names in _OPTIONAL_ENVIRONMENT_KEYS.items():
+        value = _read_first_env(env_names)
+        if value is not None:
+            values[field_name] = value
+
+    api_base_url = values.get("api_base_url", "https://api.resend.com")
+
+    timeout_value = values.get("request_timeout_seconds")
+    request_timeout = 10.0
+    if timeout_value is not None:
+        try:
+            request_timeout = float(timeout_value)
+        except ValueError as exc:  # pragma: no cover - configuration error
+            raise RuntimeError(
+                "Resend environment variables are not configured:"
+                " RESEND_HTTP_TIMEOUT_SECONDS must be a number"
+            ) from exc
+
+    return ResendSettings(
+        api_key=values["api_key"],
+        from_email=values["from_email"],
+        candidate_app_url=values["candidate_app_url"],
+        from_name=values.get("from_name"),
+        reply_to_email=values.get("reply_to_email"),
+        api_base_url=api_base_url,
+        request_timeout_seconds=request_timeout,
+    )
 
 
 class EmailServiceError(RuntimeError):
