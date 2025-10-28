@@ -4,3 +4,5 @@ sqlalchemy
 pydantic
 asyncpg
 python-dotenv
+httpx
+pyjwt

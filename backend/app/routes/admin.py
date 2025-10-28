@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models, schemas, utils
+from ..auth import SupabaseSession, require_roles
 from ..database import ASYNC_ENGINE, get_session
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -227,7 +228,10 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
 
 
 @router.post("/bootstrap", response_model=schemas.BootstrapResponse)
-async def bootstrap_database(session: AsyncSession = Depends(get_session)) -> schemas.BootstrapResponse:
+async def bootstrap_database(
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(require_roles("service_role", "admin")),
+) -> schemas.BootstrapResponse:
     """Apply database schema migrations and seed initial demo data."""
 
     applied_bytes = await _apply_schema()

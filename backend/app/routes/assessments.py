@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models, schemas
+from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 
 @router.post("", response_model=schemas.AssessmentRead, status_code=201)
 async def create_assessment(
-    payload: schemas.AssessmentCreate, session: AsyncSession = Depends(get_session)
+    payload: schemas.AssessmentCreate,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
 ) -> schemas.AssessmentRead:
     try:
         org_id = uuid.UUID(payload.org_id)
@@ -45,7 +48,11 @@ async def create_assessment(
         candidate_email_body=payload.candidate_email_body,
         time_to_start=payload.time_to_start,
         time_to_complete=payload.time_to_complete,
-        created_by=uuid.UUID(payload.created_by) if payload.created_by else None,
+        created_by=(
+            uuid.UUID(payload.created_by)
+            if payload.created_by
+            else current_session.user.id
+        ),
     )
     session.add(assessment)
     await session.commit()
@@ -55,7 +62,11 @@ async def create_assessment(
 
 @router.get("/{assessment_id}", response_model=schemas.AssessmentRead)
 async def get_assessment(
-    assessment_id: str, session: AsyncSession = Depends(get_session)
+    assessment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(
+        require_roles("owner", "admin", "viewer", "service_role")
+    ),
 ) -> schemas.AssessmentRead:
     try:
         assessment_uuid = uuid.UUID(assessment_id)

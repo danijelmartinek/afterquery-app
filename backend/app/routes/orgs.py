@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models, schemas
+from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 
 router = APIRouter(prefix="/api/orgs", tags=["orgs"])
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/api/orgs", tags=["orgs"])
 
 @router.post("", response_model=schemas.OrgRead, status_code=201)
 async def create_org(
-    payload: schemas.OrgCreate, session: AsyncSession = Depends(get_session)
+    payload: schemas.OrgCreate,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
 ) -> schemas.OrgRead:
     existing = await session.execute(select(models.Org).where(models.Org.name == payload.name))
     if existing.scalar_one_or_none() is not None:
@@ -30,7 +33,13 @@ async def create_org(
 
 
 @router.get("/{org_id}", response_model=schemas.OrgRead)
-async def get_org(org_id: str, session: AsyncSession = Depends(get_session)) -> schemas.OrgRead:
+async def get_org(
+    org_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_session: SupabaseSession = Depends(
+        require_roles("owner", "admin", "viewer", "service_role")
+    ),
+) -> schemas.OrgRead:
     try:
         org_uuid = uuid.UUID(org_id)
     except ValueError as exc:
