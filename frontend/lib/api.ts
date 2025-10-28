@@ -9,6 +9,7 @@ import type {
   EmailTemplate,
   Invitation,
   InvitationStatus,
+  OrgProfile,
   Seed,
 } from "./types";
 
@@ -116,6 +117,28 @@ export async function saveEmailTemplate(
       headers: mergedHeaders,
     },
   );
+}
+
+export type CreateOrganizationPayload = {
+  name: string;
+};
+
+export async function createOrganization(
+  payload: CreateOrganizationPayload,
+  options: ApiRequestOptions = {},
+): Promise<OrgProfile> {
+  const { headers, ...init } = options;
+  const mergedHeaders = new Headers(headers ?? {});
+  if (!mergedHeaders.has("Content-Type")) {
+    mergedHeaders.set("Content-Type", "application/json");
+  }
+
+  return fetchJson<OrgProfile>("/api/orgs", {
+    ...init,
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: mergedHeaders,
+  });
 }
 
 type CandidateStartInvitationResponse = {
@@ -480,6 +503,20 @@ type InvitationReadResponse = {
   submitted_at?: string | null;
 };
 
+type AdminInvitationResponse = {
+  id: string;
+  assessment_id: string;
+  candidate_email: string;
+  candidate_name: string | null;
+  status: string;
+  start_deadline: string | null;
+  complete_deadline: string | null;
+  start_link_token?: string | null;
+  sent_at: string;
+  started_at?: string | null;
+  submitted_at?: string | null;
+};
+
 export type CreateInvitationPayload = {
   candidateEmail: string;
   candidateName?: string;
@@ -521,4 +558,31 @@ export async function createInvitations(
     startedAt: invite.started_at ?? null,
     submittedAt: invite.submitted_at ?? null,
   }));
+}
+
+export async function markInvitationSubmitted(
+  invitationId: string,
+  options: ApiRequestOptions = {},
+): Promise<Invitation> {
+  const response = await fetchJson<AdminInvitationResponse>(
+    `/api/invitations/${encodeURIComponent(invitationId)}/mark-submitted`,
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+
+  return {
+    id: response.id,
+    assessmentId: response.assessment_id,
+    candidateEmail: response.candidate_email,
+    candidateName: response.candidate_name ?? response.candidate_email,
+    status: response.status as Invitation["status"],
+    startDeadline: response.start_deadline ?? null,
+    completeDeadline: response.complete_deadline ?? null,
+    startLinkToken: response.start_link_token ?? null,
+    sentAt: response.sent_at,
+    startedAt: response.started_at ?? null,
+    submittedAt: response.submitted_at ?? null,
+  };
 }

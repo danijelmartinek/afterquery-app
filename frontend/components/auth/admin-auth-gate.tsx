@@ -18,8 +18,7 @@ export function AdminAuthGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50">
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          Supabase authentication is not configured. Update <code>SUPABASE_URL</code> / <code>NEXT_PUBLIC_SUPABASE_URL</code>
-          and related keys to access the admin workspace.
+          Authentication is not configured. Update the required environment keys to access the admin workspace.
         </div>
       </div>
     );
