@@ -202,17 +202,19 @@ export default function AssessmentInvitesPage() {
                     {invite.completeDeadline ? new Date(invite.completeDeadline).toLocaleString() : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
-                    >
-                      {copyStates[invite.id] === "copied"
-                        ? "Copied!"
-                        : copyStates[invite.id] === "error"
-                          ? "Copy failed"
-                          : "Copy invite link"}
-                    </Button>
+                    {invite.startLinkToken ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
+                      >
+                        {copyStates[invite.id] === "copied"
+                          ? "Copied!"
+                          : copyStates[invite.id] === "error"
+                            ? "Copy failed"
+                            : "Copy invite link"}
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}

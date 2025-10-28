@@ -149,17 +149,19 @@ export default function AssessmentDetailPage() {
                   <Button asChild size="sm" variant="outline">
                     <Link href={`/app/review/${invite.id}`}>Review</Link>
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
-                  >
-                    {copyStates[invite.id] === "copied"
-                      ? "Copied!"
-                      : copyStates[invite.id] === "error"
-                        ? "Copy failed"
-                        : "Copy invite link"}
-                  </Button>
+                  {invite.startLinkToken ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopyInvite(invite.id, invite.startLinkToken)}
+                    >
+                      {copyStates[invite.id] === "copied"
+                        ? "Copied!"
+                        : copyStates[invite.id] === "error"
+                          ? "Copy failed"
+                          : "Copy invite link"}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>
