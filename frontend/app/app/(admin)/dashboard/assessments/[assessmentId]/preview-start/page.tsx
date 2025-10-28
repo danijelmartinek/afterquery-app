@@ -7,6 +7,7 @@ import { useAdminData } from "../../../../../../../providers/admin-data-provider
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../../components/ui/card";
 import { Button } from "../../../../../../../components/ui/button";
 import { Badge } from "../../../../../../../components/ui/badge";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../../lib/invite-links";
 
 export default function PreviewStartPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -19,12 +20,12 @@ export default function PreviewStartPage() {
     return <p className="text-sm text-zinc-500">Assessment not found.</p>;
   }
 
-  const [origin, setOrigin] = useState<string | null>(null);
+  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+    if (!candidateBaseFromEnv && typeof window !== "undefined") {
+      setRuntimeOrigin(window.location.origin);
     }
   }, []);
 
@@ -36,12 +37,10 @@ export default function PreviewStartPage() {
     [assessment.id, state.invitations],
   );
 
-  const inviteLink = useMemo(() => {
-    if (!origin || !latestInvitation?.startLinkToken) {
-      return null;
-    }
-    return `${origin}/candidates/${latestInvitation.startLinkToken}`;
-  }, [latestInvitation?.startLinkToken, origin]);
+  const inviteLink = useMemo(
+    () => buildCandidateStartLink(latestInvitation?.startLinkToken, runtimeOrigin),
+    [latestInvitation?.startLinkToken, runtimeOrigin],
+  );
 
   const handleCopy = useCallback(async () => {
     if (!inviteLink) {

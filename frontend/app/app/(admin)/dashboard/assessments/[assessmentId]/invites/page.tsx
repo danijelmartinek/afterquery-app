@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAdminData } from "../../../../../../../providers/admin-data-provider";
 import { useSupabaseAuth } from "../../../../../../../providers/supabase-provider";
 import { createInvitations } from "../../../../../../../lib/api";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../../lib/invite-links";
 import { Button } from "../../../../../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../../components/ui/card";
 import { Input } from "../../../../../../../components/ui/input";
@@ -24,7 +25,7 @@ export default function AssessmentInvitesPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [origin, setOrigin] = useState<string | null>(null);
+  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
   const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
 
   if (!assessment) {
@@ -34,8 +35,8 @@ export default function AssessmentInvitesPage() {
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+    if (!candidateBaseFromEnv && typeof window !== "undefined") {
+      setRuntimeOrigin(window.location.origin);
     }
   }, []);
 
@@ -84,7 +85,8 @@ export default function AssessmentInvitesPage() {
   }
 
   async function handleCopyInvite(inviteId: string, startLinkToken?: string | null) {
-    if (!origin || !startLinkToken) {
+    const inviteLink = buildCandidateStartLink(startLinkToken, runtimeOrigin);
+    if (!inviteLink) {
       setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
       scheduleReset(inviteId);
       return;
@@ -94,7 +96,7 @@ export default function AssessmentInvitesPage() {
       if (!navigator.clipboard) {
         throw new Error("Clipboard API unavailable");
       }
-      await navigator.clipboard.writeText(`${origin}/candidates/${startLinkToken}`);
+      await navigator.clipboard.writeText(inviteLink);
       setCopyStates((prev) => ({ ...prev, [inviteId]: "copied" }));
       scheduleReset(inviteId);
     } catch (copyError) {

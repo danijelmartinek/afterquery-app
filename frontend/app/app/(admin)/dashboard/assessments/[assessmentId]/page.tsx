@@ -9,6 +9,7 @@ import { Badge } from "../../../../../../components/ui/badge";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../lib/invite-links";
 
 export default function AssessmentDetailPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -22,12 +23,12 @@ export default function AssessmentDetailPage() {
   const seed = state.seeds.find((item) => item.id === assessment.seedId);
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
 
-  const [origin, setOrigin] = useState<string | null>(null);
+  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
   const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+    if (!candidateBaseFromEnv && typeof window !== "undefined") {
+      setRuntimeOrigin(window.location.origin);
     }
   }, []);
 
@@ -44,7 +45,8 @@ export default function AssessmentDetailPage() {
   }
 
   async function handleCopyInvite(inviteId: string, startLinkToken?: string | null) {
-    if (!origin || !startLinkToken) {
+    const inviteLink = buildCandidateStartLink(startLinkToken, runtimeOrigin);
+    if (!inviteLink) {
       setCopyStates((prev) => ({ ...prev, [inviteId]: "error" }));
       scheduleReset(inviteId);
       return;
@@ -54,7 +56,7 @@ export default function AssessmentDetailPage() {
       if (!navigator.clipboard) {
         throw new Error("Clipboard API unavailable");
       }
-      await navigator.clipboard.writeText(`${origin}/candidates/${startLinkToken}`);
+      await navigator.clipboard.writeText(inviteLink);
       setCopyStates((prev) => ({ ...prev, [inviteId]: "copied" }));
       scheduleReset(inviteId);
     } catch (copyError) {
