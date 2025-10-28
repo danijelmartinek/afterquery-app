@@ -152,7 +152,7 @@ class StartAssessmentResponse(BaseModel):
 
 class SubmitRequest(BaseModel):
     final_sha: Optional[str] = None
-    repo_html_url: Optional[str]
+    repo_html_url: Optional[str] = None
 
 
 class SubmitResponse(BaseModel):
