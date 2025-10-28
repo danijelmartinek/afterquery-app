@@ -33,7 +33,9 @@ app, capture its credentials, and wire it into the Afterquery backend.
 1. From the GitHub App settings page click **Install App** and choose the target
    organization.
 2. Select **All repositories**. The backend manages the visibility of new seed
-   and candidate repositories and expects access to create them on-demand.
+   and candidate repositories and expects access to create them on-demand. Make
+   sure the app is installed on any private starter repositories you plan to
+   mirror so the import step can clone their contents.
 3. After installation note the URL – the numeric segment at the end is the
    `installation_id` required by the API (for example `/installations/12345678`).
 
@@ -60,6 +62,10 @@ RS256-signed tokens:
 ```bash
 pip install -r backend/requirements.txt
 ```
+
+The backend shells out to the system `git` client to mirror repositories. Make
+sure Git is installed on the host where the FastAPI service runs (Git 2.30 or
+newer is recommended).
 
 Commit the variables to your deployment platform’s secret store. The new
 `backend/app/github_app.py` helper consumes these settings and caches the

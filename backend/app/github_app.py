@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import re
+import shutil
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -172,6 +174,65 @@ class GitHubAppClient:
             timeout=self._settings.request_timeout_seconds,
         )
 
+    async def _run_git(self, *args: str, cwd: Optional[str] = None) -> None:
+        """Execute ``git`` and raise :class:`GitHubAppError` on failure."""
+
+        sanitized_args = [
+            "***" if "x-access-token:" in arg else arg for arg in args
+        ]
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            *args,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            raise GitHubAppError(
+                "Git command failed ({}): {}".format(
+                    " ".join(sanitized_args), stderr.decode().strip()
+                )
+            )
+
+    async def _clone_and_push(
+        self,
+        *,
+        source_url: str,
+        source_branch: str,
+        destination_url: str,
+        destination_branch: str,
+    ) -> None:
+        temp_dir = tempfile.mkdtemp(prefix="afterquery-seed-")
+        repo_dir = f"{temp_dir}/repo"
+        try:
+            await self._run_git(
+                "clone",
+                "--origin",
+                "upstream",
+                "--depth",
+                "1",
+                "--branch",
+                source_branch,
+                source_url,
+                repo_dir,
+            )
+
+            await self._run_git("remote", "add", "origin", destination_url, cwd=repo_dir)
+            if destination_branch != source_branch:
+                await self._run_git("checkout", source_branch, cwd=repo_dir)
+                await self._run_git("branch", "-M", destination_branch, cwd=repo_dir)
+
+            await self._run_git(
+                "push",
+                "--set-upstream",
+                "origin",
+                destination_branch,
+                cwd=repo_dir,
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def _ensure_app_jwt(self) -> str:
         now = time.time()
         if self._app_jwt and now < self._app_jwt_expires_at - 30:
@@ -255,6 +316,14 @@ class GitHubAppClient:
 
         token = await self._get_cached_installation_token()
         async with self._build_client(token=token) as client:
+            source_response = await client.get(f"/repos/{owner}/{name}")
+            if source_response.status_code == 404:
+                raise GitHubAppError("Source repository not found or inaccessible")
+            source_response.raise_for_status()
+            source_repo = source_response.json()
+            source_default_branch = source_repo.get("default_branch") or "main"
+
+        async with self._build_client(token=token) as client:
             response = await client.post(
                 f"/orgs/{self.organization}/repos",
                 json={
@@ -272,31 +341,17 @@ class GitHubAppClient:
 
         seed_repo_full_name = f"{self.organization}/{repo_name}"
 
-        # Populate repository contents using the GitHub Importer API.
-        token = await self._get_cached_installation_token()
-        async with self._build_client(token=token) as client:
-            import_response = await client.put(
-                f"/repos/{seed_repo_full_name}/import",
-                json={"vcs_url": canonical_source},
-            )
-            if import_response.status_code not in (201, 202):
-                raise GitHubAppError(
-                    f"Failed to start import: {import_response.status_code} {import_response.text}"
-                )
-
-            # Poll until the import finishes or fails.
-            for _ in range(30):
-                status_response = await client.get(f"/repos/{seed_repo_full_name}/import")
-                status_data = status_response.json()
-                status = status_data.get("status")
-                if status in {"complete", "succeeded", "success"}:
-                    break
-                if status in {"failed", "error"}:
-                    message = status_data.get("errors") or status_data.get("message")
-                    raise GitHubAppError(f"Repository import failed: {message}")
-                await asyncio.sleep(2)
-            else:
-                raise GitHubAppError("Repository import did not complete in time")
+        # Mirror repository contents using git rather than the deprecated importer API.
+        source_clone_url = f"https://x-access-token:{token}@github.com/{owner}/{name}.git"
+        destination_clone_url = (
+            f"https://x-access-token:{token}@github.com/{seed_repo_full_name}.git"
+        )
+        await self._clone_and_push(
+            source_url=source_clone_url,
+            source_branch=source_default_branch,
+            destination_url=destination_clone_url,
+            destination_branch=default_branch,
+        )
 
         token = await self._get_cached_installation_token()
         async with self._build_client(token=token) as client:
