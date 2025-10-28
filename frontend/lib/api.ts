@@ -1,4 +1,13 @@
-import type { Assessment, Invitation, Seed } from "./types";
+import type {
+  Assessment,
+  CandidateRepo,
+  CandidateStartAssessment,
+  CandidateStartInvitation,
+  CandidateStartSeed,
+  Invitation,
+  InvitationStatus,
+  Seed,
+} from "./types";
 
 const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_BASE_URL = RAW_API_BASE.endsWith("/")
@@ -79,21 +88,122 @@ export async function fetchAdminOverview<
   >("/api/admin/overview", { cache: "no-store", ...options });
 }
 
-export type CandidateStartResponse<TInvitation, TAssessment, TSeed, TRepo> = {
-  invitation: TInvitation;
-  assessment: TAssessment;
-  seed: TSeed;
-  candidateRepo?: TRepo | null;
+type CandidateStartInvitationResponse = {
+  id: string;
+  assessmentId: string;
+  candidateEmail: string;
+  candidateName?: string | null;
+  status: InvitationStatus;
+  startDeadline?: string | null;
+  completeDeadline?: string | null;
+  sentAt: string;
+  startedAt?: string | null;
+  submittedAt?: string | null;
 };
 
-export async function fetchCandidateStart<TInvitation, TAssessment, TSeed, TRepo>(
+type CandidateStartAssessmentResponse = {
+  id: string;
+  seedId: string;
+  title: string;
+  description?: string | null;
+  instructions?: string | null;
+  candidateEmailSubject?: string | null;
+  candidateEmailBody?: string | null;
+  timeToStartHours: number;
+  timeToCompleteHours: number;
+};
+
+type CandidateStartSeedResponse = {
+  id: string;
+  seedRepo: string;
+  latestMainSha?: string | null;
+  sourceRepoUrl: string;
+};
+
+type CandidateStartRepoResponse = {
+  id: string;
+  invitationId: string;
+  repoFullName: string;
+  repoHtmlUrl?: string | null;
+  seedShaPinned: string;
+  startedAt: string;
+  lastCommitAt?: string | null;
+};
+
+type CandidateStartResponse = {
+  invitation: CandidateStartInvitationResponse;
+  assessment: CandidateStartAssessmentResponse;
+  seed: CandidateStartSeedResponse;
+  candidateRepo?: CandidateStartRepoResponse | null;
+};
+
+export type CandidateStartData = {
+  invitation: CandidateStartInvitation;
+  assessment: CandidateStartAssessment;
+  seed: CandidateStartSeed;
+  candidateRepo?: CandidateRepo;
+};
+
+export async function fetchCandidateStart(
   token: string,
   options: ApiRequestOptions = {},
-) {
-  return fetchJson<CandidateStartResponse<TInvitation, TAssessment, TSeed, TRepo>>(
+): Promise<CandidateStartData> {
+  const response = await fetchJson<CandidateStartResponse>(
     `/api/start/${encodeURIComponent(token)}`,
     { cache: "no-store", ...options },
   );
+
+  const invitation: CandidateStartInvitation = {
+    id: response.invitation.id,
+    assessmentId: response.invitation.assessmentId,
+    candidateEmail: response.invitation.candidateEmail,
+    candidateName:
+      response.invitation.candidateName ?? response.invitation.candidateEmail,
+    status: response.invitation.status,
+    startDeadline: response.invitation.startDeadline ?? null,
+    completeDeadline: response.invitation.completeDeadline ?? null,
+    sentAt: response.invitation.sentAt,
+    startedAt: response.invitation.startedAt ?? null,
+    submittedAt: response.invitation.submittedAt ?? null,
+  };
+
+  const assessment: CandidateStartAssessment = {
+    id: response.assessment.id,
+    seedId: response.assessment.seedId,
+    title: response.assessment.title,
+    description: response.assessment.description ?? null,
+    instructions: response.assessment.instructions ?? null,
+    candidateEmailSubject: response.assessment.candidateEmailSubject ?? null,
+    candidateEmailBody: response.assessment.candidateEmailBody ?? null,
+    timeToStartHours: response.assessment.timeToStartHours,
+    timeToCompleteHours: response.assessment.timeToCompleteHours,
+  };
+
+  const seed: CandidateStartSeed = {
+    id: response.seed.id,
+    seedRepo: response.seed.seedRepo,
+    latestMainSha: response.seed.latestMainSha ?? null,
+    sourceRepoUrl: response.seed.sourceRepoUrl,
+  };
+
+  const candidateRepo: CandidateRepo | undefined = response.candidateRepo
+    ? {
+        id: response.candidateRepo.id,
+        invitationId: response.candidateRepo.invitationId,
+        repoFullName: response.candidateRepo.repoFullName,
+        repoHtmlUrl: response.candidateRepo.repoHtmlUrl ?? null,
+        seedShaPinned: response.candidateRepo.seedShaPinned,
+        startedAt: response.candidateRepo.startedAt,
+        lastCommitAt: response.candidateRepo.lastCommitAt ?? null,
+      }
+    : undefined;
+
+  return {
+    invitation,
+    assessment,
+    seed,
+    candidateRepo,
+  };
 }
 
 export type CreateSeedPayload = {

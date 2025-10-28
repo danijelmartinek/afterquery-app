@@ -53,6 +53,38 @@ export type CandidateRepo = {
   lastCommitAt?: string | null;
 };
 
+export type CandidateStartInvitation = {
+  id: string;
+  assessmentId: string;
+  candidateEmail: string;
+  candidateName: string;
+  status: InvitationStatus;
+  startDeadline: string | null;
+  completeDeadline: string | null;
+  sentAt: string;
+  startedAt: string | null;
+  submittedAt: string | null;
+};
+
+export type CandidateStartAssessment = {
+  id: string;
+  seedId: string;
+  title: string;
+  description: string | null;
+  instructions: string | null;
+  candidateEmailSubject: string | null;
+  candidateEmailBody: string | null;
+  timeToStartHours: number;
+  timeToCompleteHours: number;
+};
+
+export type CandidateStartSeed = {
+  id: string;
+  seedRepo: string;
+  latestMainSha: string | null;
+  sourceRepoUrl: string;
+};
+
 export type ReviewComment = {
   id: string;
   invitationId: string;

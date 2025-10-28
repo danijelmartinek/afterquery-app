@@ -4,12 +4,17 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import type { Assessment, CandidateRepo, Invitation, Seed } from "../../lib/types";
+import type {
+  CandidateRepo,
+  CandidateStartAssessment,
+  CandidateStartInvitation,
+  CandidateStartSeed,
+} from "../../lib/types";
 
 type CandidateStartViewProps = {
-  invitation: Invitation;
-  assessment: Assessment;
-  seed: Seed;
+  invitation: CandidateStartInvitation;
+  assessment: CandidateStartAssessment;
+  seed: CandidateStartSeed;
   repo?: CandidateRepo;
   startToken: string;
 };

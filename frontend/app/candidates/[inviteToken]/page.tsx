@@ -1,132 +1,22 @@
 import { notFound } from "next/navigation";
 import { CandidateStartView } from "../../../components/candidate/candidate-start-view";
 import { fetchCandidateStart } from "../../../lib/api";
-import type { Assessment, CandidateRepo, Invitation, Seed } from "../../../lib/types";
 
-export default function CandidateStartPage({
+export default async function CandidateStartPage({
   params,
 }: {
   params: { inviteToken: string };
 }) {
-  return <CandidateStartContent inviteToken={params.inviteToken} />;
-}
-
-async function CandidateStartContent({ inviteToken }: { inviteToken: string }) {
-  type InvitationPayload = {
-    id: string;
-    assessmentId: string;
-    candidateEmail: string;
-    candidateName?: string | null;
-    status: Invitation["status"];
-    startDeadline?: string | null;
-    completeDeadline?: string | null;
-    sentAt: string;
-    startedAt?: string | null;
-    submittedAt?: string | null;
-  };
-
-  type AssessmentPayload = {
-    id: string;
-    seedId: string;
-    title: string;
-    description?: string | null;
-    instructions?: string | null;
-    candidateEmailSubject?: string | null;
-    candidateEmailBody?: string | null;
-    timeToStartHours: number;
-    timeToCompleteHours: number;
-  };
-
-  type SeedPayload = {
-    id: string;
-    seedRepo: string;
-    latestMainSha?: string | null;
-    sourceRepoUrl: string;
-  };
-
-  type RepoPayload = {
-    id: string;
-    invitationId: string;
-    repoFullName: string;
-    repoHtmlUrl?: string | null;
-    seedShaPinned: string;
-    startedAt: string;
-    lastCommitAt?: string | null;
-  };
+  const inviteToken = params.inviteToken;
 
   try {
-    const data = await fetchCandidateStart<
-      InvitationPayload,
-      AssessmentPayload,
-      SeedPayload,
-      RepoPayload
-    >(inviteToken);
-
-    const invitationPayload = data.invitation;
-    const assessmentPayload = data.assessment;
-    const seedPayload = data.seed;
-
-    if (!invitationPayload || !assessmentPayload || !seedPayload) {
-      notFound();
-    }
-
-    const invitation: Invitation = {
-      id: invitationPayload.id,
-      assessmentId: invitationPayload.assessmentId,
-      candidateEmail: invitationPayload.candidateEmail,
-      candidateName: invitationPayload.candidateName ?? invitationPayload.candidateEmail,
-      status: invitationPayload.status,
-      startDeadline: invitationPayload.startDeadline ?? invitationPayload.sentAt,
-      completeDeadline: invitationPayload.completeDeadline ?? null,
-      startLinkToken: inviteToken,
-      sentAt: invitationPayload.sentAt,
-      startedAt: invitationPayload.startedAt ?? null,
-      submittedAt: invitationPayload.submittedAt ?? null,
-    };
-
-    const nowIso = new Date().toISOString();
-
-    const assessment: Assessment = {
-      id: assessmentPayload.id,
-      orgId: "",
-      seedId: assessmentPayload.seedId,
-      title: assessmentPayload.title,
-      description: assessmentPayload.description ?? null,
-      instructions: assessmentPayload.instructions ?? null,
-      candidateEmailSubject: assessmentPayload.candidateEmailSubject ?? null,
-      candidateEmailBody: assessmentPayload.candidateEmailBody ?? null,
-      timeToStartHours: assessmentPayload.timeToStartHours,
-      timeToCompleteHours: assessmentPayload.timeToCompleteHours,
-      createdBy: null,
-      createdAt: nowIso,
-    };
-
-    const seed: Seed = {
-      id: seedPayload.id,
-      sourceRepoUrl: seedPayload.sourceRepoUrl,
-      seedRepo: seedPayload.seedRepo,
-      latestMainSha: seedPayload.latestMainSha ?? null,
-      createdAt: nowIso,
-    };
-
-    const repo: CandidateRepo | undefined = data.candidateRepo
-      ? {
-          id: data.candidateRepo.id,
-          invitationId: data.candidateRepo.invitationId,
-          repoFullName: data.candidateRepo.repoFullName,
-          repoHtmlUrl: data.candidateRepo.repoHtmlUrl ?? null,
-          seedShaPinned: data.candidateRepo.seedShaPinned,
-          startedAt: data.candidateRepo.startedAt,
-          lastCommitAt: data.candidateRepo.lastCommitAt ?? null,
-        }
-      : undefined;
-
+    const data = await fetchCandidateStart(inviteToken);
     return (
       <CandidateStartView
-        invitation={invitation}
-        assessment={assessment}
-        seed={seed}
-        repo={repo}
+        invitation={data.invitation}
+        assessment={data.assessment}
+        seed={data.seed}
+        repo={data.candidateRepo}
         startToken={inviteToken}
       />
     );
