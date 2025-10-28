@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -96,3 +97,45 @@ async def get_org_membership(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def require_org_membership_role(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    supabase_session: SupabaseSession,
+    *,
+    allowed_roles: tuple[str, ...] = ("owner", "admin"),
+    require_approved: bool = True,
+) -> Optional[models.OrgMember]:
+    """Ensure ``supabase_session`` can act on ``org_id`` with ``allowed_roles``.
+
+    Service role tokens bypass membership checks. For regular users this verifies
+    a matching membership exists, is approved (unless ``require_approved`` is
+    ``False``) and that the stored membership role is present in
+    ``allowed_roles``.
+    """
+
+    if supabase_session.user.has_role("service_role"):
+        return None
+
+    membership = await get_org_membership(db, org_id, supabase_session.user.id)
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action",
+        )
+
+    if require_approved and not membership.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your membership has not been approved yet",
+        )
+
+    normalized_roles = {role.lower() for role in allowed_roles}
+    if membership.role.lower() not in normalized_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action",
+        )
+
+    return membership

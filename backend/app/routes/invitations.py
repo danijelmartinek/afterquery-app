@@ -14,6 +14,7 @@ from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
 from ..utils import generate_token, hash_token
+from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/invitations", tags=["invitations"])
 
@@ -36,7 +37,7 @@ async def _load_assessment(
 async def create_invitations(
     payload: schemas.InvitationBatchCreate,
     session: AsyncSession = Depends(get_session),
-    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
+    current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> list[schemas.InvitationRead]:
     try:
         assessment_id = uuid.UUID(payload.assessment_id)
@@ -44,6 +45,13 @@ async def create_invitations(
         raise HTTPException(status_code=400, detail="Invalid assessment id") from exc
 
     assessment = await _load_assessment(session, assessment_id)
+
+    await require_org_membership_role(
+        session,
+        assessment.org_id,
+        current_session,
+        allowed_roles=("owner", "admin"),
+    )
 
     now = datetime.now(timezone.utc)
     start_deadline = now + assessment.time_to_start

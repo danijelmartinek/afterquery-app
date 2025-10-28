@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
+from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 async def create_assessment(
     payload: schemas.AssessmentCreate,
     session: AsyncSession = Depends(get_session),
-    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
+    current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> schemas.AssessmentRead:
     try:
         org_id = uuid.UUID(payload.org_id)
@@ -37,6 +38,13 @@ async def create_assessment(
     seed = seed_result.scalar_one_or_none()
     if seed is None:
         raise HTTPException(status_code=404, detail="Seed not found for this organization")
+
+    await require_org_membership_role(
+        session,
+        org_id,
+        current_session,
+        allowed_roles=("owner", "admin"),
+    )
 
     assessment = models.Assessment(
         org_id=org_id,

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
+from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/seeds", tags=["seeds"])
 
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api/seeds", tags=["seeds"])
 async def create_seed(
     payload: schemas.SeedCreate,
     session: AsyncSession = Depends(get_session),
-    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
+    current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> schemas.SeedRead:
     try:
         org_id = uuid.UUID(payload.org_id)
@@ -29,6 +30,13 @@ async def create_seed(
     org_result = await session.execute(select(models.Org).where(models.Org.id == org_id))
     if org_result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="Organization not found")
+
+    await require_org_membership_role(
+        session,
+        org_id,
+        current_session,
+        allowed_roles=("owner", "admin"),
+    )
 
     seed = models.Seed(
         org_id=org_id,

@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/orgs", tags=["orgs"])
 async def create_org(
     payload: schemas.OrgCreate,
     session: AsyncSession = Depends(get_session),
-    current_session: SupabaseSession = Depends(require_roles("owner", "admin", "service_role")),
+    current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
 ) -> schemas.OrgRead:
     existing = await session.execute(select(models.Org).where(models.Org.name == payload.name))
     if existing.scalar_one_or_none() is not None:
