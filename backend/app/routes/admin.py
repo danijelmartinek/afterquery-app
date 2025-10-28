@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_PATH = _REPO_ROOT / "db" / "schema.sql"
+_DEMO_DATA_PATH = _REPO_ROOT / "db" / "demo_seed_data.json"
 
 
 async def _apply_schema() -> int:
@@ -36,15 +38,65 @@ async def _apply_schema() -> int:
     return len(schema_sql)
 
 
+def _load_demo_data() -> dict:
+    """Load demo seed configuration from the repository JSON file."""
+
+    try:
+        payload = _DEMO_DATA_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:  # pragma: no cover - developer misconfiguration
+        raise HTTPException(status_code=500, detail="Demo data file not found") from exc
+
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError as exc:  # pragma: no cover - developer misconfiguration
+        raise HTTPException(status_code=500, detail="Demo data file is invalid JSON") from exc
+
+    return data
+
+
 async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
     """Seed a minimal organization, user, and assessment if absent."""
 
-    demo_org_name = "Demo Assessment Org"
-    demo_user_email = "founder@example.com"
-    demo_seed_repo = "example/fullstack-seed"
-    demo_source_repo = "https://github.com/example/fullstack-seed"
-    demo_assessment_title = "Full Stack Product Challenge"
-    demo_candidate_email = "candidate@example.com"
+    demo_data = _load_demo_data()
+
+    org_config = demo_data.get("org", {})
+    seed_config = demo_data.get("seed", {})
+    assessment_config = demo_data.get("assessment", {})
+    invitation_config = demo_data.get("invitation", {})
+
+    demo_org_name = org_config.get("name", "Demo Assessment Org")
+    members = org_config.get("members", [])
+    owner_config = next((member for member in members if member.get("role") == "owner"), None)
+    if owner_config is None and members:
+        owner_config = members[0]
+
+    demo_user_email = (owner_config or {}).get("email", "founder@example.com")
+    demo_user_name = (owner_config or {}).get("name", "Demo Founder")
+
+    demo_seed_repo = seed_config.get("seed_repo_full_name", "example/fullstack-seed")
+    demo_source_repo = seed_config.get("source_repo_url", "https://github.com/example/fullstack-seed")
+    demo_default_branch = seed_config.get("default_branch", "main")
+    demo_is_template = seed_config.get("is_template", True)
+    demo_latest_main_sha = seed_config.get("latest_main_sha")
+
+    demo_assessment_title = assessment_config.get("title", "Full Stack Product Challenge")
+    demo_assessment_description = assessment_config.get(
+        "description", "Build an end-to-end feature using the provided template."
+    )
+    demo_instructions = assessment_config.get(
+        "instructions", "Follow the README in the generated repository to get started."
+    )
+    demo_candidate_email_subject = assessment_config.get(
+        "candidate_email_subject", "Your interview project is ready"
+    )
+    demo_candidate_email_body = assessment_config.get(
+        "candidate_email_body", "Welcome! Clone the repo and submit within 48 hours."
+    )
+    demo_time_to_start = timedelta(hours=assessment_config.get("time_to_start_hours", 72))
+    demo_time_to_complete = timedelta(hours=assessment_config.get("time_to_complete_hours", 48))
+
+    demo_candidate_email = invitation_config.get("candidate_email", "candidate@example.com")
+    demo_candidate_name = invitation_config.get("candidate_name", "Demo Candidate")
 
     created_org = False
     created_user = False
@@ -65,7 +117,7 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
     user_result = await session.execute(select(models.User).where(models.User.email == demo_user_email))
     user = user_result.scalar_one_or_none()
     if user is None:
-        user = models.User(email=demo_user_email, name="Demo Founder")
+        user = models.User(email=demo_user_email, name=demo_user_name)
         session.add(user)
         await session.flush()
         created_user = True
@@ -93,9 +145,9 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
             org_id=org.id,
             source_repo_url=demo_source_repo,
             seed_repo_full_name=demo_seed_repo,
-            default_branch="main",
-            is_template=True,
-            latest_main_sha=None,
+            default_branch=demo_default_branch,
+            is_template=demo_is_template,
+            latest_main_sha=demo_latest_main_sha,
         )
         session.add(seed)
         await session.flush()
@@ -113,12 +165,12 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
             org_id=org.id,
             seed_id=seed.id,
             title=demo_assessment_title,
-            description="Build an end-to-end feature using the provided template.",
-            instructions="Follow the README in the generated repository to get started.",
-            candidate_email_subject="Your interview project is ready",
-            candidate_email_body="Welcome! Clone the repo and submit within 48 hours.",
-            time_to_start=timedelta(hours=72),
-            time_to_complete=timedelta(hours=48),
+            description=demo_assessment_description,
+            instructions=demo_instructions,
+            candidate_email_subject=demo_candidate_email_subject,
+            candidate_email_body=demo_candidate_email_body,
+            time_to_start=demo_time_to_start,
+            time_to_complete=demo_time_to_complete,
             created_by=user.id,
         )
         session.add(assessment)
@@ -135,12 +187,12 @@ async def _seed_demo_data(session: AsyncSession) -> schemas.SeedSummary:
     if invitation is None:
         raw_token = utils.generate_token()
         now = datetime.now(timezone.utc)
-        start_deadline = now + timedelta(hours=72)
-        complete_deadline = start_deadline + timedelta(hours=48)
+        start_deadline = now + demo_time_to_start
+        complete_deadline = start_deadline + demo_time_to_complete
         invitation = models.Invitation(
             assessment_id=assessment.id,
             candidate_email=demo_candidate_email,
-            candidate_name="Demo Candidate",
+            candidate_name=demo_candidate_name,
             start_link_token_hash=utils.hash_token(raw_token),
             start_deadline=start_deadline,
             complete_deadline=complete_deadline,
