@@ -165,11 +165,17 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
             </div>
             <div>
               <p className="font-semibold text-zinc-800">2. Clone the repo</p>
-              <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
-                {currentRepo
-                  ? `git clone https://github.com/${currentRepo.repoFullName}.git`
-                  : "git clone https://github.com/<org>/<assessment-repo>.git"}
-              </code>
+              {currentRepo ? (
+                <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
+                  {accessTokenInfo
+                    ? `git clone https://x-access-token:${accessTokenInfo.token}@github.com/${currentRepo.repoFullName}.git`
+                    : `git clone https://github.com/${currentRepo.repoFullName}.git`}
+                </code>
+              ) : (
+                <div className="mt-2 rounded-md border border-dashed border-zinc-300 bg-white p-4 text-xs text-zinc-500">
+                  Click <strong>Start assessment</strong> to generate your private repository and cloning instructions.
+                </div>
+              )}
               <p className="mt-2 text-xs text-zinc-500">
                 Use the token above as the HTTPS password when prompted. You can also store it in a credential helper.
               </p>
