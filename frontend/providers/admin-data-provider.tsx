@@ -33,6 +33,7 @@ type AdminDataState = {
 
 type AdminDataAction =
   | { type: "initialize"; payload: AdminDataState }
+  | { type: "createSeed"; payload: Seed }
   | { type: "createAssessment"; payload: Assessment }
   | { type: "updateAssessment"; payload: Assessment }
   | { type: "createInvitation"; payload: Invitation }
@@ -66,6 +67,8 @@ function reducer(state: AdminDataState, action: AdminDataAction): AdminDataState
   switch (action.type) {
     case "initialize":
       return action.payload;
+    case "createSeed":
+      return { ...state, seeds: [action.payload, ...state.seeds] };
     case "createAssessment":
       return { ...state, assessments: [action.payload, ...state.assessments] };
     case "updateAssessment":
