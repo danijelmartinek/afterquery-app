@@ -29,7 +29,6 @@ export default function NewAssessmentPage() {
   const [seedFormState, setSeedFormState] = useState({
     repoInput: "",
     defaultBranch: "main",
-    latestMainSha: "",
   });
   const [seedError, setSeedError] = useState<string | null>(null);
   const [creatingSeed, setCreatingSeed] = useState(false);
@@ -94,7 +93,6 @@ export default function NewAssessmentPage() {
     }
 
     const defaultBranch = seedFormState.defaultBranch.trim() || "main";
-    const latestMainSha = seedFormState.latestMainSha.trim() || null;
 
     try {
       setCreatingSeed(true);
@@ -102,15 +100,13 @@ export default function NewAssessmentPage() {
         {
           orgId: org.id,
           sourceRepoUrl: repoUrl,
-          seedRepoFullName: repoFullName,
           defaultBranch,
-          latestMainSha,
         },
         { accessToken },
       );
       dispatch({ type: "createSeed", payload: newSeed });
       setFormState((prev) => ({ ...prev, seedId: newSeed.id }));
-      setSeedFormState({ repoInput: "", defaultBranch: "main", latestMainSha: "" });
+      setSeedFormState({ repoInput: "", defaultBranch: "main" });
       setShowSeedForm(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to add repository";
@@ -246,40 +242,24 @@ export default function NewAssessmentPage() {
                   inviting candidates.
                 </p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="defaultBranch">Default branch</Label>
-                  <Input
-                    id="defaultBranch"
-                    value={seedFormState.defaultBranch}
-                    onChange={(event) =>
-                      setSeedFormState((prev) => ({ ...prev, defaultBranch: event.target.value }))
+              <div className="space-y-2">
+                <Label htmlFor="defaultBranch">Default branch</Label>
+                <Input
+                  id="defaultBranch"
+                  value={seedFormState.defaultBranch}
+                  onChange={(event) =>
+                    setSeedFormState((prev) => ({ ...prev, defaultBranch: event.target.value }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleCreateSeed();
                     }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleCreateSeed();
-                      }
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="latestMainSha">Pinned commit (optional)</Label>
-                  <Input
-                    id="latestMainSha"
-                    value={seedFormState.latestMainSha}
-                    onChange={(event) =>
-                      setSeedFormState((prev) => ({ ...prev, latestMainSha: event.target.value }))
-                    }
-                    placeholder="e.g. 1a2b3c4d"
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleCreateSeed();
-                      }
-                    }}
-                  />
-                </div>
+                  }}
+                />
+                <p className="text-xs text-zinc-500">
+                  We'll rename the source default branch to match what you enter here (defaults to main).
+                </p>
               </div>
               {seedError ? <p className="text-xs text-red-600">{seedError}</p> : null}
               <div className="flex items-center justify-end gap-3">
@@ -287,7 +267,7 @@ export default function NewAssessmentPage() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    setSeedFormState({ repoInput: "", defaultBranch: "main", latestMainSha: "" });
+                    setSeedFormState({ repoInput: "", defaultBranch: "main" });
                     setSeedError(null);
                     setShowSeedForm(false);
                   }}

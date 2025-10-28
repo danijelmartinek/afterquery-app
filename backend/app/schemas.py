@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, computed_field
 
 
 def _to_camel(string: str) -> str:
@@ -62,15 +62,22 @@ class OrgRead(OrgCreate):
 class SeedCreate(BaseModel):
     org_id: UUID
     source_repo_url: str
-    seed_repo_full_name: str
     default_branch: str = "main"
-    is_template: bool = True
-    latest_main_sha: Optional[str]
 
 
-class SeedRead(SeedCreate):
+class SeedRead(BaseModel):
     id: UUID
+    org_id: UUID
+    source_repo_url: str
+    seed_repo_full_name: str
+    default_branch: str
+    latest_main_sha: Optional[str]
     created_at: datetime
+
+    @computed_field
+    @property
+    def seed_repo_url(self) -> str:
+        return f"https://github.com/{self.seed_repo_full_name}"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -196,6 +203,8 @@ class AdminSeed(CamelModel):
     id: str
     source_repo_url: str
     seed_repo: str
+    seed_repo_url: str
+    default_branch: str
     latest_main_sha: Optional[str]
     created_at: datetime
 
@@ -297,6 +306,7 @@ class CandidateAssessment(CamelModel):
 class CandidateSeed(CamelModel):
     id: str
     seed_repo: str
+    seed_repo_url: str
     latest_main_sha: Optional[str]
     source_repo_url: str
 

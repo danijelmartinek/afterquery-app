@@ -33,6 +33,9 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<"start" | "finish" | null>(null);
   const [isRefreshing, startRefresh] = useTransition();
+  const [accessTokenInfo, setAccessTokenInfo] = useState<
+    { token: string; expiresAt: string } | null
+  >(null);
 
   const formatDate = (value: string | null) => {
     if (!value) {
@@ -60,6 +63,10 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
         completeDeadline: result.completeDeadline,
       }));
       setCurrentRepo(result.candidateRepo);
+      setAccessTokenInfo({
+        token: result.accessToken,
+        expiresAt: result.accessTokenExpiresAt,
+      });
       setActionMessage(
         `You're marked as started. Your private repo is ${result.candidateRepo.repoFullName}.`,
       );
@@ -82,6 +89,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
         status: result.status,
         submittedAt: result.submittedAt,
       }));
+      setAccessTokenInfo(null);
       setActionMessage("Thanks! We've marked your assessment as submitted.");
       refreshPage();
     } catch (error) {
@@ -111,7 +119,17 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
           <CardHeader>
             <CardTitle className="text-lg">Start your private repo</CardTitle>
             <CardDescription>
-              Repos are generated from the {seed.seedRepo} template at SHA {seed.latestMainSha}.
+              Repos are generated from the
+              {" "}
+              <a
+                href={seed.seedRepoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-blue-600 hover:underline"
+              >
+                {seed.seedRepo}
+              </a>
+              {seed.latestMainSha ? ` at SHA ${seed.latestMainSha}.` : "."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-zinc-600">
@@ -130,18 +148,31 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
             </div>
             <div>
               <p className="font-semibold text-zinc-800">1. Authenticate Git</p>
-              <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
-                git credential fill | curl -s https://app.afterquery.dev/git/credential?token={startToken}
-              </code>
-              <p className="mt-2 text-xs text-zinc-500">
-                This helper exchanges your invite token for a temporary GitHub App token. Keep the terminal open to refresh as needed.
-              </p>
+              {accessTokenInfo ? (
+                <>
+                  <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
+                    export GITHUB_TOKEN={accessTokenInfo.token}
+                  </code>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Token expires {new Date(accessTokenInfo.expiresAt).toLocaleString()}. Run commands in the same shell so Git uses the token as your HTTPS password.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Click <strong>Start assessment</strong> to mint your private repository and GitHub App token.
+                </p>
+              )}
             </div>
             <div>
               <p className="font-semibold text-zinc-800">2. Clone the repo</p>
               <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
-                git clone https://git.afterquery.dev/r/{assessment.id}.git
+                {currentRepo
+                  ? `git clone https://github.com/${currentRepo.repoFullName}.git`
+                  : "git clone https://github.com/<org>/<assessment-repo>.git"}
               </code>
+              <p className="mt-2 text-xs text-zinc-500">
+                Use the token above as the HTTPS password when prompted. You can also store it in a credential helper.
+              </p>
             </div>
             <div>
               <p className="font-semibold text-zinc-800">3. Submit</p>
@@ -151,7 +182,8 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
             </div>
             {currentRepo && (
               <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50 p-4 text-xs text-blue-700">
-                Repo provisioned at <strong>{currentRepo.repoFullName}</strong>. Resume work from your local clone.
+                Repo provisioned at <strong>{currentRepo.repoFullName}</strong>. Resume work from your local
+                clone. Need a fresh token? Click <strong>Start assessment</strong> again to reissue one instantly.
               </div>
             )}
           </CardContent>

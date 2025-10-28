@@ -453,6 +453,8 @@ async def _build_admin_overview(
                 id=str(seed.id),
                 source_repo_url=seed.source_repo_url,
                 seed_repo=seed.seed_repo_full_name,
+                seed_repo_url=f"https://github.com/{seed.seed_repo_full_name}",
+                default_branch=seed.default_branch,
                 latest_main_sha=seed.latest_main_sha,
                 created_at=seed.created_at,
             )
