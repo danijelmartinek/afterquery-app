@@ -5,19 +5,48 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../../../components/ui/button";
 import { useSupabaseAuth } from "../../../providers/supabase-provider";
+import { fetchAdminOverview } from "../../../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { supabase, session, loading, isConfigured } = useSupabaseAuth();
+  const { supabase, session, loading, isConfigured, accessToken } = useSupabaseAuth();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!loading && session && isConfigured) {
-      router.replace("/app/dashboard");
+    if (loading || !session || !isConfigured || redirecting) {
+      return;
     }
-  }, [loading, session, router, isConfigured]);
+
+    const token = accessToken ?? session.access_token ?? null;
+    if (!token) {
+      return;
+    }
+
+    let active = true;
+    setRedirecting(true);
+
+    fetchAdminOverview({ accessToken: token })
+      .then((data) => {
+        if (!active) return;
+        if (data.org) {
+          router.replace("/app/dashboard");
+        } else {
+          router.replace("/app/onboarding");
+        }
+      })
+      .catch((fetchError) => {
+        if (!active) return;
+        console.error("Failed to verify workspace after sign-in", fetchError);
+        router.replace("/app/onboarding");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [loading, session, router, isConfigured, accessToken, redirecting]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -25,7 +54,7 @@ export default function LoginPage() {
       return;
     }
     if (!supabase || !isConfigured) {
-      setError("Supabase environment variables are not configured.");
+      setError("Authentication is not configured for this environment.");
       return;
     }
     setStatus("sending");
@@ -50,7 +79,7 @@ export default function LoginPage() {
 
   const isButtonDisabled = status === "sending" || status === "sent" || !isConfigured;
   const buttonLabel = !isConfigured
-    ? "Supabase not configured"
+    ? "Authentication not configured"
     : status === "sending"
       ? "Sending magic link..."
       : status === "sent"
@@ -64,7 +93,7 @@ export default function LoginPage() {
           <p className="text-xs uppercase tracking-wide text-blue-600">Afterquery</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Sign in to continue</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Admin access uses Supabase magic links. Enter your email to receive a login link.
+            Admin access uses passwordless email links. Enter your email to receive a login link.
           </p>
         </div>
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -89,13 +118,12 @@ export default function LoginPage() {
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         {status === "sent" && !error && (
           <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-            Check your inbox for a Supabase magic link to finish signing in.
+            Check your inbox for a magic link to finish signing in.
           </div>
         )}
         {!isConfigured && (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-            Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your
-            environment to enable Supabase authentication.
+            Configure the required authentication environment variables to enable email sign-in.
           </div>
         )}
         <p className="mt-6 text-center text-xs text-zinc-500">

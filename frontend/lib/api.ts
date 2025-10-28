@@ -9,6 +9,7 @@ import type {
   EmailTemplate,
   Invitation,
   InvitationStatus,
+  OrgProfile,
   Seed,
 } from "./types";
 
@@ -116,6 +117,28 @@ export async function saveEmailTemplate(
       headers: mergedHeaders,
     },
   );
+}
+
+export type CreateOrganizationPayload = {
+  name: string;
+};
+
+export async function createOrganization(
+  payload: CreateOrganizationPayload,
+  options: ApiRequestOptions = {},
+): Promise<OrgProfile> {
+  const { headers, ...init } = options;
+  const mergedHeaders = new Headers(headers ?? {});
+  if (!mergedHeaders.has("Content-Type")) {
+    mergedHeaders.set("Content-Type", "application/json");
+  }
+
+  return fetchJson<OrgProfile>("/api/orgs", {
+    ...init,
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: mergedHeaders,
+  });
 }
 
 type CandidateStartInvitationResponse = {
