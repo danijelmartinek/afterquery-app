@@ -163,7 +163,12 @@ class Invitation(Base):
     candidate_email: Mapped[str] = mapped_column(String, nullable=False)
     candidate_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[InvitationStatus] = mapped_column(
-        Enum(InvitationStatus, name="invitation_status"),
+        Enum(
+            InvitationStatus,
+            name="invitation_status",
+            native_enum=False,
+            validate_strings=True,
+        ),
         default=InvitationStatus.sent,
         nullable=False,
     )
@@ -240,7 +245,13 @@ class AccessToken(Base, TimestampMixin):
     repo_full_name: Mapped[str] = mapped_column(String, nullable=False)
     opaque_token_hash: Mapped[str] = mapped_column(String, nullable=False)
     scope: Mapped[AccessScope] = mapped_column(
-        Enum(AccessScope, name="access_scope"),
+        Enum(
+            AccessScope,
+            name="access_scope",
+            native_enum=False,
+            validate_strings=True,
+            create_constraint=False,
+        ),
         default=AccessScope.clone_push,
         nullable=False,
     )
@@ -338,7 +349,13 @@ class EmailEvent(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("invitations.id", ondelete="CASCADE"), nullable=False
     )
     type: Mapped[Optional[EmailEventType]] = mapped_column(
-        Enum(EmailEventType, name="email_event_type"), nullable=True
+        Enum(
+            EmailEventType,
+            name="email_event_type",
+            native_enum=False,
+            validate_strings=True,
+        ),
+        nullable=True,
     )
     provider_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     to_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
