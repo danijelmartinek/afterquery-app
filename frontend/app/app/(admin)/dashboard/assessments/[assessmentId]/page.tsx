@@ -1,6 +1,6 @@
 "use client";
 
-import { notFound, useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useAdminData } from "../../../../../../providers/admin-data-provider";
 import { Button } from "../../../../../../components/ui/button";
@@ -14,11 +14,19 @@ import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../..
 export default function AssessmentDetailPage() {
   const params = useParams<{ assessmentId: string }>();
   const { state } = useAdminData();
+  const router = useRouter();
 
   const assessment = state.assessments.find((item) => item.id === params.assessmentId);
+  useEffect(() => {
+    if (!assessment) {
+      router.back();
+    }
+  }, [assessment, router]);
+
   if (!assessment) {
-    notFound();
+    return null;
   }
+
   const seed = state.seeds.find((item) => item.id === assessment.seedId);
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
 

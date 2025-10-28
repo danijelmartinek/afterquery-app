@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { notFound, useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useAdminData } from "../../../../../providers/admin-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
@@ -18,9 +18,15 @@ export default function ReviewWorkspacePage() {
   const { state, dispatch } = useAdminData();
   const { accessToken } = useSupabaseAuth();
   const invitation = state.invitations.find((item) => item.id === params.invitationId);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!invitation) {
+      router.back();
+    }
+  }, [invitation, router]);
 
   if (!invitation) {
-    notFound();
     return null;
   }
 
