@@ -1,0 +1,56 @@
+"""Seed management endpoints."""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .. import models, schemas
+from ..database import get_session
+
+router = APIRouter(prefix="/api/seeds", tags=["seeds"])
+
+
+@router.post("", response_model=schemas.SeedRead, status_code=201)
+async def create_seed(
+    payload: schemas.SeedCreate, session: AsyncSession = Depends(get_session)
+) -> schemas.SeedRead:
+    try:
+        org_id = uuid.UUID(payload.org_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid org id") from exc
+
+    org_result = await session.execute(select(models.Org).where(models.Org.id == org_id))
+    if org_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    seed = models.Seed(
+        org_id=org_id,
+        source_repo_url=payload.source_repo_url,
+        seed_repo_full_name=payload.seed_repo_full_name,
+        default_branch=payload.default_branch,
+        is_template=payload.is_template,
+        latest_main_sha=payload.latest_main_sha,
+    )
+    session.add(seed)
+    await session.commit()
+    await session.refresh(seed)
+    return schemas.SeedRead.from_orm(seed)
+
+
+@router.get("/{seed_id}", response_model=schemas.SeedRead)
+async def get_seed(seed_id: str, session: AsyncSession = Depends(get_session)) -> schemas.SeedRead:
+    try:
+        seed_uuid = uuid.UUID(seed_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid seed id") from exc
+
+    result = await session.execute(select(models.Seed).where(models.Seed.id == seed_uuid))
+    seed = result.scalar_one_or_none()
+    if seed is None:
+        raise HTTPException(status_code=404, detail="Seed not found")
+    return schemas.SeedRead.from_orm(seed)
+

@@ -1,0 +1,32 @@
+{
+  "org": {
+    "name": "Demo Assessment Org",
+    "members": [
+      {
+        "email": "founder@example.com",
+        "name": "Demo Founder",
+        "role": "owner"
+      }
+    ]
+  },
+  "seed": {
+    "source_repo_url": "https://github.com/example/fullstack-seed",
+    "seed_repo_full_name": "example/fullstack-seed",
+    "default_branch": "main",
+    "is_template": true,
+    "latest_main_sha": null
+  },
+  "assessment": {
+    "title": "Full Stack Product Challenge",
+    "description": "Build an end-to-end feature using the provided template.",
+    "instructions": "Follow the README in the generated repository to get started.",
+    "candidate_email_subject": "Your interview project is ready",
+    "candidate_email_body": "Welcome! Clone the repo and submit within 48 hours.",
+    "time_to_start_hours": 72,
+    "time_to_complete_hours": 48
+  },
+  "invitation": {
+    "candidate_email": "candidate@example.com",
+    "candidate_name": "Demo Candidate"
+  }
+}
