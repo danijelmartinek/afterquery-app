@@ -204,28 +204,28 @@ class GitHubAppClient:
         destination_branch: str,
     ) -> None:
         temp_dir = tempfile.mkdtemp(prefix="afterquery-seed-")
-        repo_dir = f"{temp_dir}/repo"
+        repo_dir = f"{temp_dir}/repo.git"
         try:
             await self._run_git(
                 "clone",
-                "--origin",
-                "upstream",
-                "--branch",
-                source_branch,
+                "--mirror",
                 source_url,
                 repo_dir,
             )
 
-            await self._run_git("remote", "add", "origin", destination_url, cwd=repo_dir)
-            if destination_branch != source_branch:
-                await self._run_git("checkout", source_branch, cwd=repo_dir)
-                await self._run_git("branch", "-M", destination_branch, cwd=repo_dir)
+            await self._run_git(
+                "remote",
+                "set-url",
+                "--push",
+                "origin",
+                destination_url,
+                cwd=repo_dir,
+            )
 
             await self._run_git(
                 "push",
-                "--set-upstream",
+                "--mirror",
                 "origin",
-                destination_branch,
                 cwd=repo_dir,
             )
         finally:
