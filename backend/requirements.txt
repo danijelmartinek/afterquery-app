@@ -7,3 +7,4 @@ asyncpg
 python-dotenv
 httpx
 pyjwt
+cryptography

@@ -54,6 +54,13 @@ GITHUB_ORG=your-company
 # GITHUB_CANDIDATE_PREFIX=afterquery-candidate
 ```
 
+Install the backend dependencies to ensure the GitHub App helper can mint
+RS256-signed tokens:
+
+```bash
+pip install -r backend/requirements.txt
+```
+
 Commit the variables to your deployment platform’s secret store. The new
 `backend/app/github_app.py` helper consumes these settings and caches the
 installation token automatically.
