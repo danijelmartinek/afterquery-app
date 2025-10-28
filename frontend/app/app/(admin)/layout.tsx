@@ -1,5 +1,6 @@
 import { AdminDataProvider } from "../../../providers/admin-data-provider";
 import { AppShell } from "../../../components/layout/app-shell";
+import { AdminAuthGate } from "../../../components/auth/admin-auth-gate";
 
 export default function AdminAppLayout({
   children,
@@ -7,8 +8,10 @@ export default function AdminAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AdminDataProvider>
-      <AppShell>{children}</AppShell>
-    </AdminDataProvider>
+    <AdminAuthGate>
+      <AdminDataProvider>
+        <AppShell>{children}</AppShell>
+      </AdminDataProvider>
+    </AdminAuthGate>
   );
 }

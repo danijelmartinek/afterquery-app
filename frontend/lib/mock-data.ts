@@ -22,6 +22,7 @@ export const adminUser: AdminUser = {
   id: "user-1",
   name: "Alex Rivera",
   email: "alex@afterquery.com",
+  role: "authenticated",
 };
 
 export const seeds: Seed[] = [
@@ -130,7 +131,7 @@ export const candidateRepos: CandidateRepo[] = [
     invitationId: invitations[0].id,
     repoFullName: "afterquery/casey-frontend",
     repoHtmlUrl: "https://github.com/afterquery/casey-frontend",
-    seedShaPinned: seeds[0].latestMainSha,
+    seedShaPinned: seeds[0].latestMainSha ?? "",
     startedAt: subDays(now, 0.5).toISOString(),
     lastCommitAt: addMinutes(subDays(now, 0.1), -12).toISOString(),
   },
@@ -139,7 +140,7 @@ export const candidateRepos: CandidateRepo[] = [
     invitationId: invitations[2].id,
     repoFullName: "afterquery/mike-broker",
     repoHtmlUrl: "https://github.com/afterquery/mike-broker",
-    seedShaPinned: seeds[1].latestMainSha,
+    seedShaPinned: seeds[1].latestMainSha ?? "",
     startedAt: subDays(now, 4).toISOString(),
     lastCommitAt: subDays(now, 1).toISOString(),
   },

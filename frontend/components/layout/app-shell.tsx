@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { useAdminData } from "../../providers/admin-data-provider";
 import { FileCode2, LayoutDashboard, Layers, LogOut, Mail } from "lucide-react";
+import { useSupabaseAuth } from "../../providers/supabase-provider";
 
 const NAV_LINKS = [
   { href: "/app/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -17,6 +19,35 @@ const NAV_LINKS = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { currentAdmin, org } = useAdminData();
+  const router = useRouter();
+  const { signOut, user: supabaseUser } = useSupabaseAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const displayName = useMemo(() => {
+    if (currentAdmin.name && currentAdmin.name.trim().length > 0) {
+      return currentAdmin.name;
+    }
+    const metadata = supabaseUser?.user_metadata ?? {};
+    if (typeof metadata.full_name === "string" && metadata.full_name.trim()) {
+      return metadata.full_name.trim();
+    }
+    if (typeof metadata.name === "string" && metadata.name.trim()) {
+      return metadata.name.trim();
+    }
+    return currentAdmin.email ?? supabaseUser?.email ?? "Admin";
+  }, [currentAdmin, supabaseUser]);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Failed to sign out", error);
+    } finally {
+      setIsSigningOut(false);
+      router.replace("/app/login");
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-zinc-50">
@@ -63,12 +94,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4">
           <div>
             <p className="text-sm text-zinc-500">Logged in as</p>
-            <p className="font-medium text-zinc-900">{currentAdmin.name}</p>
+            <p className="font-medium text-zinc-900">{displayName}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+            >
               <LogOut className="h-4 w-4" />
-              Sign out
+              {isSigningOut ? "Signing out..." : "Sign out"}
             </Button>
           </div>
         </header>

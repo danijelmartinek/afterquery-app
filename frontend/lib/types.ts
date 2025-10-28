@@ -2,7 +2,7 @@ export type Seed = {
   id: string;
   sourceRepoUrl: string;
   seedRepo: string;
-  latestMainSha: string;
+  latestMainSha: string | null;
   createdAt: string;
 };
 
@@ -37,7 +37,7 @@ export type Invitation = {
   status: InvitationStatus;
   startDeadline: string;
   completeDeadline?: string;
-  startLinkToken: string;
+  startLinkToken?: string | null;
   sentAt: string;
   startedAt?: string;
   submittedAt?: string;
@@ -47,24 +47,25 @@ export type CandidateRepo = {
   id: string;
   invitationId: string;
   repoFullName: string;
-  repoHtmlUrl: string;
+  repoHtmlUrl: string | null;
   seedShaPinned: string;
   startedAt: string;
-  lastCommitAt?: string;
+  lastCommitAt?: string | null;
 };
 
 export type ReviewComment = {
   id: string;
   invitationId: string;
-  author: string;
+  author: string | null;
   body: string;
   createdAt: string;
 };
 
 export type AdminUser = {
   id: string;
-  name: string;
-  email: string;
+  name: string | null;
+  email: string | null;
+  role: string | null;
 };
 
 export type OrgProfile = {
@@ -77,8 +78,8 @@ export type EmailTemplate = {
   id: string;
   orgId: string;
   name: string;
-  subject: string;
-  body: string;
-  description: string;
+  subject: string | null;
+  body: string | null;
+  description: string | null;
   updatedAt: string;
 };

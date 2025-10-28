@@ -11,9 +11,10 @@ type CandidateStartViewProps = {
   assessment: Assessment;
   seed: Seed;
   repo?: CandidateRepo;
+  startToken: string;
 };
 
-export function CandidateStartView({ invitation, assessment, seed, repo }: CandidateStartViewProps) {
+export function CandidateStartView({ invitation, assessment, seed, repo, startToken }: CandidateStartViewProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-zinc-50 px-6 py-10">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -45,7 +46,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo }: Candi
             <div>
               <p className="font-semibold text-zinc-800">1. Authenticate Git</p>
               <code className="mt-2 block rounded-md bg-zinc-900 p-4 font-mono text-xs text-zinc-100">
-                git credential fill | curl -s https://app.afterquery.dev/git/credential?token={invitation.startLinkToken}
+                git credential fill | curl -s https://app.afterquery.dev/git/credential?token={startToken}
               </code>
               <p className="mt-2 text-xs text-zinc-500">
                 This helper exchanges your invite token for a temporary GitHub App token. Keep the terminal open to refresh as needed.

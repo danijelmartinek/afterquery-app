@@ -48,7 +48,7 @@ export default function EmailSettingsPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor={`${template.id}-subject`}>Subject</Label>
-                    <Input id={`${template.id}-subject`} defaultValue={template.subject} />
+                    <Input id={`${template.id}-subject`} defaultValue={template.subject ?? ""} />
                   </div>
                   <div className="space-y-2">
                     <Label>Last updated</Label>
@@ -58,7 +58,7 @@ export default function EmailSettingsPage() {
                   </div>
                   <div className="md:col-span-2 space-y-2">
                     <Label htmlFor={`${template.id}-body`}>Body</Label>
-                    <Textarea id={`${template.id}-body`} defaultValue={template.body} className="min-h-[200px]" />
+                    <Textarea id={`${template.id}-body`} defaultValue={template.body ?? ""} className="min-h-[200px]" />
                   </div>
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
