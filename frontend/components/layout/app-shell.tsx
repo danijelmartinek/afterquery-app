@@ -63,7 +63,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4">
           <div>
             <p className="text-sm text-zinc-500">Logged in as</p>
-            <p className="font-medium text-zinc-900">{currentAdmin.name}</p>
+            <p className="font-medium text-zinc-900">
+              {currentAdmin.name ?? currentAdmin.email ?? "Admin"}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" className="gap-2">
