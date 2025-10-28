@@ -2,16 +2,16 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useAdminData } from "../../../../../../../providers/admin-data-provider";
-import { useSupabaseAuth } from "../../../../../../../providers/supabase-provider";
-import { createInvitations } from "../../../../../../../lib/api";
-import { buildCandidateStartLink, candidateBaseFromEnv } from "../../../../../../../lib/invite-links";
-import { Button } from "../../../../../../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../../components/ui/card";
-import { Input } from "../../../../../../../components/ui/input";
-import { Label } from "../../../../../../../components/ui/label";
-import { Badge } from "../../../../../../../components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../../../../components/ui/table";
+import { useAdminData } from "@/providers/admin-data-provider";
+import { useSupabaseAuth } from "@/providers/supabase-provider";
+import { createInvitations } from "@/lib/api";
+import { buildCandidateStartLink, candidateBaseFromEnv } from "@/lib/invite-links";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 
 export default function AssessmentInvitesPage() {
