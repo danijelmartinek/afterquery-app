@@ -151,7 +151,8 @@ class ResendEmailService:
             template = default
         rendered = template
         for key, value in context.items():
-            rendered = rendered.replace(f"{{{{{key}}}}}", value)
+            for placeholder in (f"{{{{{key}}}}}", f"{{{key}}}"):
+                rendered = rendered.replace(placeholder, value)
         if include_start_link_fallback and "{{start_link}}" not in template and context.get("start_link"):
             rendered = f"{rendered}\n\nStart your project: {context['start_link']}"
         return rendered
@@ -171,12 +172,25 @@ class ResendEmailService:
             "{{start_link}}\n"
         )
 
-        context: Mapping[str, str] = {
+        def _format_deadline(value: Optional[datetime]) -> Optional[str]:
+            if value is None:
+                return None
+            return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M %Z")
+
+        context: dict[str, str] = {
             "candidate_name": invitation.candidate_name or invitation.candidate_email,
             "candidate_email": invitation.candidate_email,
             "assessment_title": assessment.title,
             "start_link": start_link,
         }
+
+        optional_context = {
+            "start_deadline": _format_deadline(invitation.start_deadline),
+            "complete_deadline": _format_deadline(invitation.complete_deadline),
+        }
+        for key, value in optional_context.items():
+            if value is not None:
+                context[key] = value
 
         subject_template = assessment.candidate_email_subject or subject_default
         subject = self._render_template(
