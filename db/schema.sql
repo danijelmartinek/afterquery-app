@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS github_installation_states (
   return_path text,
   created_at timestamptz DEFAULT now()
 );
+ALTER TABLE github_installation_states
+  ADD COLUMN IF NOT EXISTS return_path text;
 CREATE INDEX IF NOT EXISTS idx_github_installation_states_org_id ON github_installation_states(org_id);
 
 -- Seeds
