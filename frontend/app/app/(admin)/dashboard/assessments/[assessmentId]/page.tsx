@@ -17,11 +17,20 @@ export default function AssessmentDetailPage() {
   const router = useRouter();
 
   const assessment = state.assessments.find((item) => item.id === params.assessmentId);
+  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
+  const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
+
   useEffect(() => {
     if (!assessment) {
       router.back();
     }
   }, [assessment, router]);
+
+  useEffect(() => {
+    if (!candidateBaseFromEnv && typeof window !== "undefined") {
+      setRuntimeOrigin(window.location.origin);
+    }
+  }, []);
 
   if (!assessment) {
     return null;
@@ -29,15 +38,6 @@ export default function AssessmentDetailPage() {
 
   const seed = state.seeds.find((item) => item.id === assessment.seedId);
   const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
-
-  const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
-  const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
-
-  useEffect(() => {
-    if (!candidateBaseFromEnv && typeof window !== "undefined") {
-      setRuntimeOrigin(window.location.origin);
-    }
-  }, []);
 
   function scheduleReset(inviteId: string) {
     setTimeout(() => {

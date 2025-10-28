@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useAdminData } from "../../../../../providers/admin-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
@@ -26,24 +26,27 @@ export default function ReviewWorkspacePage() {
     }
   }, [invitation, router]);
 
+  const repo = invitation
+    ? state.candidateRepos.find((item) => item.invitationId === invitation.id)
+    : null;
+  const comments = invitation
+    ? state.reviewComments.filter((comment) => comment.invitationId === invitation.id)
+    : [];
+  const [draftComment, setDraftComment] = useState("");
+  const lastActivity = invitation
+    ? invitation.submittedAt ?? repo?.lastCommitAt ?? invitation.sentAt
+    : null;
+
+  const [markingSubmitted, setMarkingSubmitted] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
+
   if (!invitation) {
     return null;
   }
 
   const activeInvitation = invitation;
   const assessment = state.assessments.find((item) => item.id === activeInvitation.assessmentId);
-  const repo = state.candidateRepos.find((item) => item.invitationId === activeInvitation.id);
-  const comments = state.reviewComments.filter((comment) => comment.invitationId === activeInvitation.id);
-  const [draftComment, setDraftComment] = useState("");
-
-  const lastActivity = useMemo(() => {
-    if (activeInvitation.submittedAt) return activeInvitation.submittedAt;
-    if (repo?.lastCommitAt) return repo.lastCommitAt;
-    return activeInvitation.sentAt;
-  }, [activeInvitation.sentAt, activeInvitation.submittedAt, repo?.lastCommitAt]);
-
-  const [markingSubmitted, setMarkingSubmitted] = useState(false);
-  const [markError, setMarkError] = useState<string | null>(null);
+  const resolvedLastActivity = lastActivity ?? activeInvitation.sentAt;
 
   async function handleMarkSubmitted() {
     if (activeInvitation.status === "submitted") {
@@ -127,7 +130,7 @@ export default function ReviewWorkspacePage() {
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-zinc-400">Last activity</p>
-                  <p>{formatDistanceToNow(new Date(lastActivity), { addSuffix: true })}</p>
+                  <p>{formatDistanceToNow(new Date(resolvedLastActivity), { addSuffix: true })}</p>
                 </div>
               </CardContent>
             </Card>

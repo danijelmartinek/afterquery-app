@@ -28,17 +28,17 @@ export default function AssessmentInvitesPage() {
   const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
   const [copyStates, setCopyStates] = useState<Record<string, "copied" | "error">>({});
 
-  if (!assessment) {
-    return <p className="text-sm text-zinc-500">Assessment not found.</p>;
-  }
-
-  const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
-
   useEffect(() => {
     if (!candidateBaseFromEnv && typeof window !== "undefined") {
       setRuntimeOrigin(window.location.origin);
     }
   }, []);
+
+  if (!assessment) {
+    return <p className="text-sm text-zinc-500">Assessment not found.</p>;
+  }
+
+  const invites = state.invitations.filter((invite) => invite.assessmentId === assessment.id);
 
   async function handleCreateInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

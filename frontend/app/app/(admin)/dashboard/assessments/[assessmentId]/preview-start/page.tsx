@@ -15,13 +15,6 @@ export default function PreviewStartPage() {
 
   const assessment = state.assessments.find((item) => item.id === params.assessmentId);
   const seed = state.seeds.find((item) => item.id === assessment?.seedId);
-
-  if (!assessment || !seed) {
-    return <p className="text-sm text-zinc-500">Assessment not found.</p>;
-  }
-
-  const seedOwner = seed.seedRepo.split("/")[0] ?? seed.seedRepo;
-
   const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
@@ -31,13 +24,19 @@ export default function PreviewStartPage() {
     }
   }, []);
 
-  const latestInvitation = useMemo(
-    () =>
+  const assessmentId = assessment?.id ?? null;
+
+  const latestInvitation = useMemo(() => {
+    if (!assessmentId) {
+      return null;
+    }
+
+    return (
       state.invitations
-        .filter((invitation) => invitation.assessmentId === assessment.id && invitation.startLinkToken)
-        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())[0] ?? null,
-    [assessment.id, state.invitations],
-  );
+        .filter((invitation) => invitation.assessmentId === assessmentId && invitation.startLinkToken)
+        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())[0] ?? null
+    );
+  }, [assessmentId, state.invitations]);
 
   const inviteLink = useMemo(
     () => buildCandidateStartLink(latestInvitation?.startLinkToken, runtimeOrigin),
@@ -63,6 +62,12 @@ export default function PreviewStartPage() {
       setTimeout(() => setCopyState("idle"), 2000);
     }
   }, [inviteLink]);
+
+  if (!assessment || !seed) {
+    return <p className="text-sm text-zinc-500">Assessment not found.</p>;
+  }
+
+  const seedOwner = seed.seedRepo.split("/")[0] ?? seed.seedRepo;
 
   const content = (
     <div className="mx-auto max-w-3xl space-y-6">

@@ -244,7 +244,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
                 <p className="mt-2 text-xs text-zinc-500">
                   You generated a GitHub token when you started this assessment. Use that saved token (for example by setting
                   {" "}
-                  <code className="rounded bg-zinc-200 px-1 py-0.5 text-[11px]">export GITHUB_TOKEN=your-token</code>) to authenticate. Tokens can't be re-displayed for security—reach out to your coordinator if you need a new one.
+                  <code className="rounded bg-zinc-200 px-1 py-0.5 text-[11px]">export GITHUB_TOKEN=your-token</code>) to authenticate. Tokens can’t be re-displayed for security—reach out to your coordinator if you need a new one.
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-zinc-500">
@@ -272,7 +272,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
             <div>
               <p className="font-semibold text-zinc-800">3. Submit</p>
               <p className="mt-1 text-xs text-zinc-500">
-                Push your final commits to <span className="font-mono">main</span> before the completion window expires. We'll email confirmation immediately.
+                Push your final commits to <span className="font-mono">main</span> before the completion window expires. We’ll email confirmation immediately.
               </p>
             </div>
             {currentRepo && (
@@ -288,7 +288,7 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
           <CardHeader>
             <CardTitle className="text-lg">Instructions</CardTitle>
             <CardDescription>
-              Follow these steps carefully. We'll discuss trade-offs during your review conversation.
+              Follow these steps carefully. We’ll discuss trade-offs during your review conversation.
             </CardDescription>
           </CardHeader>
           <CardContent className="prose prose-zinc max-w-none">
@@ -299,11 +299,11 @@ export function CandidateStartView({ invitation, assessment, seed, repo, startTo
         <div className="space-y-2">
           {actionError && <p className="text-sm text-red-600">{actionError}</p>}
           {actionMessage && <p className="text-sm text-green-700">{actionMessage}</p>}
-          {isSubmitted && currentInvitation.submittedAt && (
-            <p className="text-sm text-green-700">
-              Assessment submitted on {formatDate(currentInvitation.submittedAt)}. We'll be in touch soon.
-            </p>
-          )}
+            {isSubmitted && currentInvitation.submittedAt && (
+              <p className="text-sm text-green-700">
+                Assessment submitted on {formatDate(currentInvitation.submittedAt)}. We’ll be in touch soon.
+              </p>
+            )}
           <div className="flex flex-wrap items-center justify-end gap-3">
             {!hasStarted && (
               <Button
