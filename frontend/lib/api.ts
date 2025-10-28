@@ -1,9 +1,11 @@
 import type {
   Assessment,
   CandidateRepo,
+  CandidateStartActionResult,
   CandidateStartAssessment,
   CandidateStartInvitation,
   CandidateStartSeed,
+  CandidateSubmitResult,
   Invitation,
   InvitationStatus,
   Seed,
@@ -130,6 +132,18 @@ type CandidateStartRepoResponse = {
   lastCommitAt?: string | null;
 };
 
+type CandidateRepoReadResponse = {
+  id: string;
+  invitation_id: string;
+  seed_sha_pinned: string;
+  repo_full_name: string;
+  repo_html_url?: string | null;
+  github_repo_id?: number | null;
+  active: boolean;
+  archived: boolean;
+  created_at: string;
+};
+
 type CandidateStartResponse = {
   invitation: CandidateStartInvitationResponse;
   assessment: CandidateStartAssessmentResponse;
@@ -142,6 +156,24 @@ export type CandidateStartData = {
   assessment: CandidateStartAssessment;
   seed: CandidateStartSeed;
   candidateRepo?: CandidateRepo;
+};
+
+type StartAssessmentResponse = {
+  invitation_id: string;
+  status: InvitationStatus;
+  started_at: string;
+  complete_deadline?: string | null;
+  candidate_repo: CandidateRepoReadResponse;
+  access_token: string;
+  access_token_expires_at: string;
+};
+
+type SubmitAssessmentResponse = {
+  invitation_id: string;
+  submission_id: string;
+  final_sha: string;
+  submitted_at: string;
+  status: InvitationStatus;
 };
 
 export async function fetchCandidateStart(
@@ -203,6 +235,71 @@ export async function fetchCandidateStart(
     assessment,
     seed,
     candidateRepo,
+  };
+}
+
+export async function startCandidateAssessment(
+  token: string,
+  options: ApiRequestOptions = {},
+): Promise<CandidateStartActionResult> {
+  const response = await fetchJson<StartAssessmentResponse>(
+    `/api/start/${encodeURIComponent(token)}`,
+    {
+      method: "POST",
+      ...options,
+    },
+  );
+
+  const repo: CandidateRepo = {
+    id: response.candidate_repo.id,
+    invitationId: response.candidate_repo.invitation_id,
+    repoFullName: response.candidate_repo.repo_full_name,
+    repoHtmlUrl: response.candidate_repo.repo_html_url ?? null,
+    seedShaPinned: response.candidate_repo.seed_sha_pinned,
+    startedAt: response.candidate_repo.created_at,
+    lastCommitAt: null,
+  };
+
+  return {
+    invitationId: response.invitation_id,
+    status: response.status,
+    startedAt: response.started_at,
+    completeDeadline: response.complete_deadline ?? null,
+    candidateRepo: repo,
+    accessToken: response.access_token,
+    accessTokenExpiresAt: response.access_token_expires_at,
+  };
+}
+
+export type SubmitCandidateAssessmentPayload = {
+  finalSha?: string;
+  repoHtmlUrl?: string;
+};
+
+export async function submitCandidateAssessment(
+  token: string,
+  payload: SubmitCandidateAssessmentPayload = {},
+  options: ApiRequestOptions = {},
+): Promise<CandidateSubmitResult> {
+  const response = await fetchJson<SubmitAssessmentResponse>(
+    `/api/submit/${encodeURIComponent(token)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        final_sha: payload.finalSha,
+        repo_html_url: payload.repoHtmlUrl,
+      }),
+      ...options,
+    },
+  );
+
+  return {
+    invitationId: response.invitation_id,
+    submissionId: response.submission_id,
+    finalSha: response.final_sha,
+    submittedAt: response.submitted_at,
+    status: response.status,
   };
 }
 

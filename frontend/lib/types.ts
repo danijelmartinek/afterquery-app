@@ -85,6 +85,24 @@ export type CandidateStartSeed = {
   sourceRepoUrl: string;
 };
 
+export type CandidateStartActionResult = {
+  invitationId: string;
+  status: InvitationStatus;
+  startedAt: string;
+  completeDeadline: string | null;
+  candidateRepo: CandidateRepo;
+  accessToken: string;
+  accessTokenExpiresAt: string;
+};
+
+export type CandidateSubmitResult = {
+  invitationId: string;
+  submissionId: string;
+  finalSha: string;
+  submittedAt: string;
+  status: InvitationStatus;
+};
+
 export type ReviewComment = {
   id: string;
   invitationId: string;

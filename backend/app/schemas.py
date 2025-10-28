@@ -135,13 +135,16 @@ class CandidateRepoRead(BaseModel):
 
 class StartAssessmentResponse(BaseModel):
     invitation_id: UUID
+    status: str
+    started_at: datetime
+    complete_deadline: Optional[datetime]
     candidate_repo: CandidateRepoRead
     access_token: str = Field(..., description="Opaque token presented to the git credential broker")
     access_token_expires_at: datetime
 
 
 class SubmitRequest(BaseModel):
-    final_sha: str
+    final_sha: Optional[str] = None
     repo_html_url: Optional[str]
 
 
@@ -150,6 +153,7 @@ class SubmitResponse(BaseModel):
     submission_id: UUID
     final_sha: str
     submitted_at: datetime
+    status: str
 
 
 class InvitationDetail(BaseModel):

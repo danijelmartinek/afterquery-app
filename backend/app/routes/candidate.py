@@ -155,6 +155,9 @@ async def start_assessment(
 
     return schemas.StartAssessmentResponse(
         invitation_id=str(invitation.id),
+        status=invitation.status.value,
+        started_at=invitation.started_at,
+        complete_deadline=invitation.complete_deadline,
         candidate_repo=schemas.CandidateRepoRead.from_orm(candidate_repo),
         access_token=access_token_value,
         access_token_expires_at=access_token.expires_at,
@@ -180,9 +183,11 @@ async def submit_assessment(
     invitation.status = models.InvitationStatus.submitted
     invitation.submitted_at = now
 
+    final_sha = payload.final_sha or candidate_repo.seed_sha_pinned
+
     submission = models.Submission(
         invitation_id=invitation.id,
-        final_sha=payload.final_sha,
+        final_sha=final_sha,
         repo_html_url=payload.repo_html_url or candidate_repo.repo_html_url,
     )
     session.add(submission)
@@ -200,5 +205,6 @@ async def submit_assessment(
         submission_id=str(submission.id),
         final_sha=submission.final_sha,
         submitted_at=invitation.submitted_at,
+        status=invitation.status.value,
     )
 
