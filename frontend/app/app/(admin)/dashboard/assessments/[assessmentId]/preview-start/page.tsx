@@ -20,6 +20,8 @@ export default function PreviewStartPage() {
     return <p className="text-sm text-zinc-500">Assessment not found.</p>;
   }
 
+  const seedOwner = seed.seedRepo.split("/")[0] ?? seed.seedRepo;
+
   const [runtimeOrigin, setRuntimeOrigin] = useState<string | null>(candidateBaseFromEnv);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
@@ -75,12 +77,15 @@ export default function PreviewStartPage() {
             <h2 className="text-xl font-semibold text-zinc-900">{assessment.title}</h2>
           </div>
           <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-700">
-            <p className="font-medium">Repo provisioning command</p>
+            <p className="font-medium">Git commands shown to candidates</p>
             <code className="mt-2 block font-mono text-xs text-blue-800">
-              {"gh auth login --with-token <<<\"$(curl -s https://app.afterquery.dev/git/credential?token=sample)\""}
+              export GITHUB_TOKEN=&lt;token minted after clicking Start&gt;
+            </code>
+            <code className="mt-2 block font-mono text-xs text-blue-800">
+              {`git clone https://github.com/${seedOwner}/candidate-<invite>.git`}
             </code>
             <p className="mt-2 text-xs text-blue-700">
-              The helper mints a GitHub App token tied to {seed.seedRepo}. Tokens expire hourly and refresh automatically while the window is open.
+              Tokens are issued by the GitHub App for {seed.seedRepo} and expire hourly. Candidates can re-click Start to refresh their token at any time.
             </p>
           </div>
           <div className="rounded-lg border border-zinc-200 bg-white p-4">

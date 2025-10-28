@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
+from ..github_app import GitHubAppError, GitHubAppClient, get_github_app_client
 from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/seeds", tags=["seeds"])
@@ -21,6 +22,7 @@ async def create_seed(
     payload: schemas.SeedCreate,
     session: AsyncSession = Depends(get_session),
     current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
+    github: GitHubAppClient = Depends(get_github_app_client),
 ) -> schemas.SeedRead:
     org_id = payload.org_id
 
@@ -35,13 +37,20 @@ async def create_seed(
         allowed_roles=("owner", "admin"),
     )
 
+    try:
+        repo, latest_sha, canonical_source = await github.ensure_seed_repository(
+            payload.source_repo_url, default_branch=payload.default_branch
+        )
+    except GitHubAppError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
     seed = models.Seed(
         org_id=org_id,
-        source_repo_url=payload.source_repo_url,
-        seed_repo_full_name=payload.seed_repo_full_name,
-        default_branch=payload.default_branch,
-        is_template=payload.is_template,
-        latest_main_sha=payload.latest_main_sha,
+        source_repo_url=canonical_source,
+        seed_repo_full_name=repo.full_name,
+        default_branch=repo.default_branch,
+        is_template=True,
+        latest_main_sha=latest_sha,
     )
     session.add(seed)
     await session.commit()

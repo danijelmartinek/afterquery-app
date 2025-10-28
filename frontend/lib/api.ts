@@ -118,6 +118,7 @@ type CandidateStartAssessmentResponse = {
 type CandidateStartSeedResponse = {
   id: string;
   seedRepo: string;
+  seedRepoUrl: string;
   latestMainSha?: string | null;
   sourceRepoUrl: string;
 };
@@ -214,6 +215,7 @@ export async function fetchCandidateStart(
   const seed: CandidateStartSeed = {
     id: response.seed.id,
     seedRepo: response.seed.seedRepo,
+    seedRepoUrl: response.seed.seedRepoUrl,
     latestMainSha: response.seed.latestMainSha ?? null,
     sourceRepoUrl: response.seed.sourceRepoUrl,
   };
@@ -306,10 +308,7 @@ export async function submitCandidateAssessment(
 export type CreateSeedPayload = {
   orgId: string;
   sourceRepoUrl: string;
-  seedRepoFullName: string;
-  defaultBranch: string;
-  isTemplate?: boolean;
-  latestMainSha?: string | null;
+  defaultBranch?: string;
 };
 
 type SeedReadResponse = {
@@ -318,19 +317,16 @@ type SeedReadResponse = {
   source_repo_url: string;
   seed_repo_full_name: string;
   default_branch: string;
-  is_template: boolean;
   latest_main_sha: string | null;
   created_at: string;
+  seed_repo_url: string;
 };
 
 export async function createSeed(payload: CreateSeedPayload, options: ApiRequestOptions = {}) {
   const body = {
     org_id: payload.orgId,
     source_repo_url: payload.sourceRepoUrl,
-    seed_repo_full_name: payload.seedRepoFullName,
-    default_branch: payload.defaultBranch,
-    is_template: payload.isTemplate ?? true,
-    latest_main_sha: payload.latestMainSha ?? null,
+    default_branch: payload.defaultBranch ?? "main",
   };
 
   const seed = await fetchJson<SeedReadResponse>("/api/seeds", {
@@ -347,6 +343,8 @@ export async function createSeed(payload: CreateSeedPayload, options: ApiRequest
     id: seed.id,
     sourceRepoUrl: seed.source_repo_url,
     seedRepo: seed.seed_repo_full_name,
+    seedRepoUrl: seed.seed_repo_url ?? `https://github.com/${seed.seed_repo_full_name}`,
+    defaultBranch: seed.default_branch,
     latestMainSha: seed.latest_main_sha,
     createdAt: seed.created_at,
   };

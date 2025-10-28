@@ -47,7 +47,20 @@ export default function AssessmentListPage() {
                 return (
                   <TableRow key={assessment.id}>
                     <TableCell className="font-medium text-zinc-900">{assessment.title}</TableCell>
-                    <TableCell>{seed?.seedRepo}</TableCell>
+                    <TableCell>
+                      {seed ? (
+                        <a
+                          href={seed.seedRepoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {seed.seedRepo}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     <TableCell>
                       Start {assessment.timeToStartHours}h · Complete {assessment.timeToCompleteHours}h
                     </TableCell>

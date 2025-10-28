@@ -11,7 +11,8 @@ from sqlalchemy.orm import selectinload
 
 from .. import models, schemas
 from ..database import get_session
-from ..utils import generate_token, hash_token
+from ..github_app import GitHubAppClient, GitHubAppError, get_github_app_client
+from ..utils import hash_token
 
 router = APIRouter(prefix="/api", tags=["candidate"])
 
@@ -82,6 +83,7 @@ async def get_invitation_details(
         seed=schemas.CandidateSeed(
             id=str(seed.id),
             seed_repo=seed.seed_repo_full_name,
+            seed_repo_url=f"https://github.com/{seed.seed_repo_full_name}",
             latest_main_sha=seed.latest_main_sha,
             source_repo_url=seed.source_repo_url,
         ),
@@ -103,7 +105,9 @@ async def get_invitation_details(
 
 @router.post("/start/{token}", response_model=schemas.StartAssessmentResponse)
 async def start_assessment(
-    token: str, session: AsyncSession = Depends(get_session)
+    token: str,
+    session: AsyncSession = Depends(get_session),
+    github: GitHubAppClient = Depends(get_github_app_client),
 ) -> schemas.StartAssessmentResponse:
     invitation = await _get_invitation_by_token(session, token)
 
@@ -128,25 +132,68 @@ async def start_assessment(
     invitation.started_at = now
     invitation.complete_deadline = now + assessment.time_to_complete
 
+    seed_model = assessment.seed
+
+    default_branch = seed_model.default_branch or "main"
+
+    try:
+        latest_seed_sha = await github.refresh_branch_sha(
+            seed_model.seed_repo_full_name, branch=default_branch
+        )
+    except GitHubAppError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if latest_seed_sha != seed_model.latest_main_sha:
+        seed_model.latest_main_sha = latest_seed_sha
+
     if invitation.candidate_repo is None:
-        repo_full_name = f"candidate-{invitation.id}"  # placeholder until GitHub integration exists
+        candidate_slug = invitation.id.hex[:10]
+        try:
+            repo_info = await github.create_candidate_repository(
+                seed_model.seed_repo_full_name,
+                default_branch=default_branch,
+                candidate_slug=candidate_slug,
+            )
+        except GitHubAppError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
         candidate_repo = models.CandidateRepo(
             invitation_id=invitation.id,
-            seed_sha_pinned=assessment.seed.latest_main_sha,
-            repo_full_name=repo_full_name,
+            seed_sha_pinned=latest_seed_sha,
+            repo_full_name=repo_info.full_name,
+            repo_html_url=repo_info.html_url,
+            github_repo_id=repo_info.id,
         )
         session.add(candidate_repo)
         await session.flush()
         await session.refresh(candidate_repo)
     else:
         candidate_repo = invitation.candidate_repo
+        latest_seed_sha = candidate_repo.seed_sha_pinned
 
-    access_token_value = generate_token()
+    for token_model in invitation.access_tokens:
+        if not token_model.revoked:
+            token_model.revoked = True
+
+    if candidate_repo.github_repo_id is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Candidate repository is missing GitHub metadata",
+        )
+
+    try:
+        github_token, github_expires_at = await github.create_repository_access_token(
+            candidate_repo.github_repo_id
+        )
+    except GitHubAppError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    access_token_value = github_token
     access_token = models.AccessToken(
         invitation_id=invitation.id,
         repo_full_name=candidate_repo.repo_full_name,
         opaque_token_hash=hash_token(access_token_value),
-        expires_at=now + assessment.time_to_complete,
+        expires_at=github_expires_at,
     )
     session.add(access_token)
     await session.commit()
@@ -169,6 +216,7 @@ async def submit_assessment(
     token: str,
     payload: schemas.SubmitRequest,
     session: AsyncSession = Depends(get_session),
+    github: GitHubAppClient = Depends(get_github_app_client),
 ) -> schemas.SubmitResponse:
     invitation = await _get_invitation_by_token(session, token)
 
@@ -196,6 +244,13 @@ async def submit_assessment(
     for token_model in invitation.access_tokens:
         if not token_model.revoked:
             token_model.revoked = True
+
+    try:
+        await github.archive_repository(candidate_repo.repo_full_name)
+        candidate_repo.archived = True
+        candidate_repo.active = False
+    except GitHubAppError:
+        candidate_repo.active = False
 
     await session.commit()
     await session.refresh(submission)

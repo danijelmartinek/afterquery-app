@@ -2,6 +2,8 @@ export type Seed = {
   id: string;
   sourceRepoUrl: string;
   seedRepo: string;
+  seedRepoUrl: string;
+  defaultBranch?: string;
   latestMainSha: string | null;
   createdAt: string;
 };
@@ -81,6 +83,7 @@ export type CandidateStartAssessment = {
 export type CandidateStartSeed = {
   id: string;
   seedRepo: string;
+  seedRepoUrl: string;
   latestMainSha: string | null;
   sourceRepoUrl: string;
 };
