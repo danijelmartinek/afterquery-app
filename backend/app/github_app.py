@@ -210,8 +210,6 @@ class GitHubAppClient:
                 "clone",
                 "--origin",
                 "upstream",
-                "--depth",
-                "1",
                 "--branch",
                 source_branch,
                 source_url,
