@@ -15,6 +15,8 @@ const buttonVariants = cva(
           "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 focus-visible:ring-zinc-200",
         ghost: "hover:bg-zinc-100 hover:text-zinc-900",
         subtle: "bg-brand-subtle text-blue-700 hover:bg-blue-200",
+        secondary: "bg-zinc-100 text-zinc-900 hover:bg-zinc-200",
+        link: "text-blue-600 underline-offset-4 hover:underline focus-visible:ring-0 focus-visible:ring-offset-0",
       },
       size: {
         default: "h-10 px-4 py-2",

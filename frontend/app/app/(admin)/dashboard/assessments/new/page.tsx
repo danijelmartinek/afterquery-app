@@ -62,6 +62,11 @@ export default function NewAssessmentPage() {
     if (creatingSeed) return;
     setSeedError(null);
 
+    if (!org) {
+      setSeedError("Create or join an organization before adding repositories");
+      return;
+    }
+
     const trimmedInput = seedFormState.repoInput.trim();
     if (!trimmedInput) {
       setSeedError("Enter a template repository link");
@@ -125,6 +130,11 @@ export default function NewAssessmentPage() {
 
     if (!accessToken) {
       setFormError("Sign in to create assessments");
+      return;
+    }
+
+    if (!org) {
+      setFormError("Create or join an organization before creating assessments");
       return;
     }
 
