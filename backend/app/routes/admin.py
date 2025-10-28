@@ -32,8 +32,14 @@ async def _apply_schema() -> int:
     if not schema_sql.strip():
         return 0
 
+    statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
+
+    if not statements:
+        return 0
+
     async with ASYNC_ENGINE.begin() as conn:
-        await conn.exec_driver_sql(schema_sql)
+        for statement in statements:
+            await conn.exec_driver_sql(statement)
 
     return len(schema_sql)
 
