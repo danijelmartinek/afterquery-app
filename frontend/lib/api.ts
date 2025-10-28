@@ -93,7 +93,7 @@ export async function fetchAdminOverview<
       TOrg,
       TMembership,
       TInstallation
-    >,
+    >
   >("/api/admin/overview", { cache: "no-store", ...options });
 }
 
