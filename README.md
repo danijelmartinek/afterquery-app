@@ -3,9 +3,9 @@
 
 # SUBMISSION
 
-1. PASTE YOUR DEMO VIDEO LINK HERE
-2. PASTE A LINK TO YOUR PRODUCTION DEPLOYMENT HERE
-3. MAKE SURE TO FILL OUT .ENV.EXAMPLE
+1. PASTE YOUR DEMO VIDEO LINK HERE - https://www.loom.com/share/9ef0ae8fcab64d33ba15e3d01a27ff4f
+2. PASTE A LINK TO YOUR PRODUCTION DEPLOYMENT HERE - https://collabdot.com
+3. MAKE SURE TO FILL OUT .ENV.EXAMPLE - there is one .env.example in root and also one inside frontend/ dir.
 
 # Full Stack Starter Template
 
