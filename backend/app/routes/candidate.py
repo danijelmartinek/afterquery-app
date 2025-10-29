@@ -12,12 +12,13 @@ from sqlalchemy.orm import selectinload
 
 from .. import models, schemas
 from ..database import get_session
-from ..github_app import GitHubAppClient, GitHubAppError, get_github_app_client
+from ..github_app import GitHubAppError
 from ..services.email import (
     EmailServiceError,
     ResendEmailService,
     get_resend_email_service,
 )
+from ..services.github_installations import require_github_installation_client
 from ..utils import hash_token
 
 router = APIRouter(prefix="/api", tags=["candidate"])
@@ -116,7 +117,6 @@ async def get_invitation_details(
 async def start_assessment(
     token: str,
     session: AsyncSession = Depends(get_session),
-    github: GitHubAppClient = Depends(get_github_app_client),
     email_service: ResendEmailService = Depends(get_resend_email_service),
 ) -> schemas.StartAssessmentResponse:
     invitation = await _get_invitation_by_token(session, token)
@@ -143,6 +143,8 @@ async def start_assessment(
     invitation.complete_deadline = now + assessment.time_to_complete
 
     seed_model = assessment.seed
+
+    github = await require_github_installation_client(session, seed_model.org_id)
 
     default_branch = seed_model.default_branch or "main"
 
@@ -243,7 +245,6 @@ async def submit_assessment(
     token: str,
     payload: schemas.SubmitRequest,
     session: AsyncSession = Depends(get_session),
-    github: GitHubAppClient = Depends(get_github_app_client),
     email_service: ResendEmailService = Depends(get_resend_email_service),
 ) -> schemas.SubmitResponse:
     invitation = await _get_invitation_by_token(session, token)
@@ -258,6 +259,10 @@ async def submit_assessment(
     candidate_repo = invitation.candidate_repo
     if candidate_repo is None:
         raise HTTPException(status_code=400, detail="Candidate repository has not been provisioned")
+
+    seed_model = assessment.seed
+    if seed_model is None:
+        raise HTTPException(status_code=404, detail="Assessment seed not found")
 
     now = datetime.now(timezone.utc)
     invitation.status = models.InvitationStatus.submitted
@@ -276,6 +281,8 @@ async def submit_assessment(
     for token_model in invitation.access_tokens:
         if not token_model.revoked:
             token_model.revoked = True
+
+    github = await require_github_installation_client(session, seed_model.org_id)
 
     try:
         await github.archive_repository(candidate_repo.repo_full_name)

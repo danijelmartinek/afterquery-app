@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminData } from "@/providers/admin-data-provider";
 import { useSupabaseAuth } from "@/providers/supabase-provider";
-import { createAssessment, createSeed } from "@/lib/api";
+import { createAssessment, createSeed, startGitHubInstallation } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function NewAssessmentPage() {
   const router = useRouter();
-  const { state, dispatch, currentAdmin, org } = useAdminData();
+  const { state, dispatch, currentAdmin, org, githubInstallation } = useAdminData();
   const { accessToken, user: supabaseUser } = useSupabaseAuth();
   const [formState, setFormState] = useState({
     title: "",
@@ -34,6 +34,16 @@ export default function NewAssessmentPage() {
   const [creatingSeed, setCreatingSeed] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectingGitHub, setConnectingGitHub] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  const isGitHubConnected = githubInstallation?.connected ?? false;
+
+  useEffect(() => {
+    if (isGitHubConnected) {
+      setConnectError(null);
+    }
+  }, [isGitHubConnected]);
 
   useEffect(() => {
     setFormState((prev) => {
@@ -58,12 +68,49 @@ export default function NewAssessmentPage() {
 
   const hasSeeds = state.seeds.length > 0;
 
+  async function handleConnectGitHub() {
+    if (connectingGitHub) return;
+    setConnectError(null);
+
+    if (!org) {
+      setConnectError("Create or join an organization before connecting GitHub");
+      return;
+    }
+
+    if (!accessToken) {
+      setConnectError("Sign in to connect the GitHub App");
+      return;
+    }
+
+    try {
+      setConnectingGitHub(true);
+      const callbackUrl = `${window.location.origin}/app/github/install/callback`;
+      const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const installationUrl = await startGitHubInstallation(org.id, {
+        accessToken,
+        redirectUrl: callbackUrl,
+        returnPath,
+      });
+      window.location.href = installationUrl;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to start GitHub installation";
+      setConnectError(message);
+    } finally {
+      setConnectingGitHub(false);
+    }
+  }
+
   async function handleCreateSeed() {
     if (creatingSeed) return;
     setSeedError(null);
 
     if (!org) {
       setSeedError("Create or join an organization before adding repositories");
+      return;
+    }
+
+    if (!isGitHubConnected) {
+      setSeedError("Connect the GitHub App before adding repositories");
       return;
     }
 
@@ -115,7 +162,11 @@ export default function NewAssessmentPage() {
       setShowSeedForm(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to add repository";
-      setSeedError(message);
+      if (message.includes('409')) {
+        setSeedError('Connect the GitHub App before adding repositories.');
+      } else {
+        setSeedError(message);
+      }
     } finally {
       setCreatingSeed(false);
     }
@@ -231,6 +282,23 @@ export default function NewAssessmentPage() {
           </div>
           {showSeedForm ? (
             <div className="space-y-4 rounded-lg border border-dashed border-zinc-300 p-4">
+              {!isGitHubConnected ? (
+                <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                  <p>Connect the GitHub App to mirror repositories into this project.</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleConnectGitHub}
+                      disabled={connectingGitHub}
+                    >
+                      {connectingGitHub ? "Redirecting..." : "Connect GitHub App"}
+                    </Button>
+                    {connectError ? <p className="text-xs text-red-600">{connectError}</p> : null}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="repoInput">Template repository link</Label>
                 <Input
@@ -284,7 +352,7 @@ export default function NewAssessmentPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="button" onClick={handleCreateSeed} disabled={creatingSeed}>
+                <Button type="button" onClick={handleCreateSeed} disabled={creatingSeed || !isGitHubConnected}>
                   {creatingSeed ? "Saving..." : "Save repository"}
                 </Button>
               </div>

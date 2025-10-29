@@ -23,6 +23,32 @@ CREATE TABLE IF NOT EXISTS org_members (
 );
 CREATE INDEX IF NOT EXISTS idx_org_members_supabase_user ON org_members(supabase_user_id);
 
+-- GitHub App installations scoped to projects
+CREATE TABLE IF NOT EXISTS github_installations (
+  org_id uuid PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,
+  installation_id bigint NOT NULL,
+  target_type text NOT NULL,
+  account_login text NOT NULL,
+  account_id bigint NOT NULL,
+  account_avatar_url text,
+  account_html_url text,
+  installation_html_url text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (installation_id)
+);
+
+CREATE TABLE IF NOT EXISTS github_installation_states (
+  token text PRIMARY KEY,
+  org_id uuid REFERENCES orgs(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  return_path text,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE github_installation_states
+  ADD COLUMN IF NOT EXISTS return_path text;
+CREATE INDEX IF NOT EXISTS idx_github_installation_states_org_id ON github_installation_states(org_id);
+
 -- Seeds
 CREATE TABLE IF NOT EXISTS seeds (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

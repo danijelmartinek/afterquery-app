@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models, schemas
 from ..auth import SupabaseSession, require_roles
 from ..database import get_session
-from ..github_app import GitHubAppError, GitHubAppClient, get_github_app_client
+from ..github_app import GitHubAppError
+from ..services.github_installations import require_github_installation_client
 from ..services.supabase_memberships import require_org_membership_role
 
 router = APIRouter(prefix="/api/seeds", tags=["seeds"])
@@ -22,7 +23,6 @@ async def create_seed(
     payload: schemas.SeedCreate,
     session: AsyncSession = Depends(get_session),
     current_session: SupabaseSession = Depends(require_roles("authenticated", "service_role")),
-    github: GitHubAppClient = Depends(get_github_app_client),
 ) -> schemas.SeedRead:
     org_id = payload.org_id
 
@@ -36,6 +36,8 @@ async def create_seed(
         current_session,
         allowed_roles=("owner", "admin"),
     )
+
+    github = await require_github_installation_client(session, org_id)
 
     try:
         repo, latest_sha, canonical_source = await github.ensure_seed_repository(

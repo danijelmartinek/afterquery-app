@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import lifespan
-from .routes import admin, assessments, candidate, invitations, orgs, seeds
+from .routes import admin, assessments, candidate, github, invitations, orgs, seeds
 
 app = FastAPI(title="Backend API", lifespan=lifespan)
 
@@ -80,6 +80,7 @@ app.include_router(seeds.router)
 app.include_router(assessments.router)
 app.include_router(invitations.router)
 app.include_router(candidate.router)
+app.include_router(github.router)
 
 
 @app.get("/")

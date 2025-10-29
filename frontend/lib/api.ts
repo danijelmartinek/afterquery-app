@@ -11,6 +11,7 @@ import type {
   InvitationStatus,
   OrgProfile,
   Seed,
+  GitHubInstallation,
 } from "./types";
 
 const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -53,7 +54,8 @@ export type AdminOverviewResponse<
   TTemplate,
   TUser,
   TOrg,
-  TMembership
+  TMembership,
+  TInstallation = GitHubInstallation
 > = {
   assessments: TAssessment[];
   invitations: TInvitation[];
@@ -64,6 +66,7 @@ export type AdminOverviewResponse<
   currentAdmin: TUser | null;
   org: TOrg | null;
   membership: TMembership | null;
+  githubInstallation: TInstallation | null;
 };
 
 export async function fetchAdminOverview<
@@ -75,7 +78,8 @@ export async function fetchAdminOverview<
   TTemplate,
   TUser,
   TOrg,
-  TMembership
+  TMembership,
+  TInstallation = GitHubInstallation
 >(options: ApiRequestOptions = {}) {
   return fetchJson<
     AdminOverviewResponse<
@@ -87,7 +91,8 @@ export async function fetchAdminOverview<
       TTemplate,
       TUser,
       TOrg,
-      TMembership
+      TMembership,
+      TInstallation
     >
   >("/api/admin/overview", { cache: "no-store", ...options });
 }
@@ -401,6 +406,62 @@ export async function createSeed(payload: CreateSeedPayload, options: ApiRequest
   };
 
   return normalized;
+}
+
+type GitHubInstallationStartResponse = {
+  installationUrl: string;
+};
+
+export type GitHubInstallationStartOptions = ApiRequestOptions & {
+  redirectUrl?: string;
+  returnPath?: string;
+};
+
+export async function startGitHubInstallation(
+  orgId: string,
+  options: GitHubInstallationStartOptions = {},
+) {
+  const { redirectUrl, returnPath, headers, ...requestOptions } = options;
+
+  const response = await fetchJson<GitHubInstallationStartResponse>(
+    "/api/github/installations/start",
+    {
+      ...requestOptions,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(headers ?? {}),
+      },
+      body: JSON.stringify({
+        org_id: orgId,
+        ...(redirectUrl ? { redirect_url: redirectUrl } : {}),
+        ...(returnPath ? { return_path: returnPath } : {}),
+      }),
+    },
+  );
+
+  return response.installationUrl;
+}
+
+type GitHubInstallationCompleteResponse = {
+  installation: GitHubInstallation;
+  returnPath?: string | null;
+};
+
+export async function completeGitHubInstallation(
+  state: string,
+  installationId: number,
+  options: ApiRequestOptions = {},
+): Promise<GitHubInstallationCompleteResponse> {
+  return fetchJson<GitHubInstallationCompleteResponse>("/api/github/installations/complete", {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers ?? {}),
+    },
+    body: JSON.stringify({ state, installation_id: installationId }),
+  });
 }
 
 export type CreateAssessmentPayload = {

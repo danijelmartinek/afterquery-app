@@ -272,6 +272,16 @@ class EmailTemplateUpsert(CamelModel):
     body: Optional[str]
 
 
+class AdminGitHubInstallation(CamelModel):
+    connected: bool
+    installation_id: Optional[int]
+    account_login: Optional[str]
+    account_html_url: Optional[str]
+    installation_html_url: Optional[str]
+    target_type: Optional[str]
+    connected_at: Optional[datetime]
+
+
 class AdminOrgOverview(CamelModel):
     org: Optional[AdminOrg]
     current_admin: Optional[AdminUser]
@@ -282,6 +292,7 @@ class AdminOrgOverview(CamelModel):
     candidate_repos: List[AdminCandidateRepo]
     review_comments: List[AdminReviewComment]
     email_templates: List[AdminEmailTemplate]
+    github_installation: Optional[AdminGitHubInstallation]
 
 
 class CandidateInvitation(CamelModel):
@@ -332,4 +343,24 @@ class CandidateStartData(CamelModel):
     assessment: CandidateAssessment
     seed: CandidateSeed
     candidate_repo: Optional[CandidateRepoInfo]
+
+
+class GitHubInstallationStartRequest(CamelModel):
+    org_id: UUID
+    redirect_url: Optional[str] = None
+    return_path: Optional[str] = None
+
+
+class GitHubInstallationStartResponse(CamelModel):
+    installation_url: str
+
+
+class GitHubInstallationCompleteRequest(CamelModel):
+    state: str
+    installation_id: int
+
+
+class GitHubInstallationCompleteResponse(CamelModel):
+    installation: AdminGitHubInstallation
+    return_path: Optional[str] = None
 

@@ -38,8 +38,9 @@ class GitHubAppSettings(BaseSettings):
 
     app_id: str = Field(..., alias="github_app_id", env="GITHUB_APP_ID")
     private_key: str = Field(..., alias="github_app_private_key", env="GITHUB_APP_PRIVATE_KEY")
-    installation_id: int = Field(..., alias="github_app_installation_id", env="GITHUB_APP_INSTALLATION_ID")
-    organization: str = Field(..., alias="github_org", env="GITHUB_ORG")
+    app_slug: Optional[str] = Field(
+        None, alias="github_app_slug", env="GITHUB_APP_SLUG"
+    )
     api_base_url: str = Field("https://api.github.com", env="GITHUB_API_BASE_URL")
     request_timeout_seconds: float = Field(15.0, env="GITHUB_HTTP_TIMEOUT_SECONDS")
     seed_repo_prefix: str = Field("afterquery-seed", env="GITHUB_SEED_PREFIX")
@@ -62,6 +63,15 @@ class GitHubAppSettings(BaseSettings):
         if "-----BEGIN" not in key:
             key = key.encode("utf-8").decode("unicode_escape")
         return key
+
+    def require_app_slug(self) -> str:
+        """Return the configured GitHub App slug or raise a helpful error."""
+
+        if not self.app_slug:
+            raise RuntimeError(
+                "GitHub App slug is not configured; set the GITHUB_APP_SLUG environment variable"
+            )
+        return self.app_slug
 
 
 @lru_cache
@@ -118,9 +128,18 @@ def _parse_repo_identifier(source: str) -> tuple[str, str]:
 class GitHubAppClient:
     """Lightweight wrapper for GitHub App installation interactions."""
 
-    def __init__(self, settings: GitHubAppSettings) -> None:
+    def __init__(
+        self,
+        settings: GitHubAppSettings,
+        *,
+        installation_id: Optional[int] = None,
+        organization: Optional[str] = None,
+        private_key: Optional[str] = None,
+    ) -> None:
         self._settings = settings
-        self._private_key = settings.normalized_private_key()
+        self._installation_id = installation_id
+        self._organization = organization
+        self._private_key = private_key or settings.normalized_private_key()
         self._app_jwt: Optional[str] = None
         self._app_jwt_expires_at: float = 0.0
         self._installation_token: Optional[str] = None
@@ -128,7 +147,26 @@ class GitHubAppClient:
 
     @property
     def organization(self) -> str:
-        return self._settings.organization
+        if not self._organization:
+            raise RuntimeError("GitHub App organization is not configured")
+        return self._organization
+
+    @property
+    def installation_id(self) -> int:
+        if self._installation_id is None:
+            raise RuntimeError("GitHub App installation is not configured")
+        return self._installation_id
+
+    def with_installation(self, installation_id: int, organization: str) -> "GitHubAppClient":
+        client = GitHubAppClient(
+            self._settings,
+            installation_id=installation_id,
+            organization=organization,
+            private_key=self._private_key,
+        )
+        client._app_jwt = self._app_jwt
+        client._app_jwt_expires_at = self._app_jwt_expires_at
+        return client
 
     async def _request(
         self,
@@ -174,7 +212,7 @@ class GitHubAppClient:
             timeout=self._settings.request_timeout_seconds,
         )
 
-    async def _run_git(self, *args: str, cwd: Optional[str] = None) -> None:
+    async def _run_git(self, *args: str, cwd: Optional[str] = None) -> str:
         """Execute ``git`` and raise :class:`GitHubAppError` on failure."""
 
         sanitized_args = [
@@ -194,6 +232,7 @@ class GitHubAppClient:
                     " ".join(sanitized_args), stderr.decode().strip()
                 )
             )
+        return stdout.decode().strip()
 
     async def _clone_and_push(
         self,
@@ -202,9 +241,10 @@ class GitHubAppClient:
         source_branch: str,
         destination_url: str,
         destination_branch: str,
-    ) -> None:
+    ) -> str:
         temp_dir = tempfile.mkdtemp(prefix="afterquery-seed-")
         repo_dir = f"{temp_dir}/repo.git"
+        branch_sha: Optional[str] = None
         try:
             await self._run_git(
                 "clone",
@@ -212,6 +252,15 @@ class GitHubAppClient:
                 source_url,
                 repo_dir,
             )
+
+            rev_parse_output = await self._run_git(
+                "rev-parse",
+                f"refs/heads/{source_branch}",
+                cwd=repo_dir,
+            )
+            branch_sha = rev_parse_output.strip() or None
+            if branch_sha is None:
+                raise GitHubAppError("Unable to determine seed branch SHA from source")
 
             await self._run_git(
                 "remote",
@@ -228,6 +277,7 @@ class GitHubAppClient:
                 "origin",
                 cwd=repo_dir,
             )
+            return branch_sha
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -270,7 +320,7 @@ class GitHubAppClient:
             response = await self._request(
                 client,
                 "POST",
-                f"/app/installations/{self._settings.installation_id}/access_tokens",
+                f"/app/installations/{self.installation_id}/access_tokens",
                 token=app_jwt,
                 token_is_app=True,
                 json=payload or None,
@@ -344,7 +394,7 @@ class GitHubAppClient:
         destination_clone_url = (
             f"https://x-access-token:{token}@github.com/{seed_repo_full_name}.git"
         )
-        await self._clone_and_push(
+        branch_sha = await self._clone_and_push(
             source_url=source_clone_url,
             source_branch=source_default_branch,
             destination_url=destination_clone_url,
@@ -377,14 +427,14 @@ class GitHubAppClient:
                 },
             )
 
-            branch_response = await client.get(
-                f"/repos/{seed_repo_full_name}/git/ref/heads/{default_branch}"
-            )
-            branch_data = branch_response.json()
-            branch_object = branch_data.get("object", {})
-            sha = branch_object.get("sha")
-            if not isinstance(sha, str):
-                raise GitHubAppError("Unable to determine seed main branch SHA")
+            try:
+                sha = await self._fetch_branch_head_sha(
+                    client=client,
+                    repo_full_name=seed_repo_full_name,
+                    branch=default_branch,
+                )
+            except GitHubAppError:
+                sha = branch_sha
 
         full_name = repo_data.get("full_name")
         if not isinstance(full_name, str):
@@ -410,12 +460,51 @@ class GitHubAppClient:
     async def refresh_branch_sha(self, repo_full_name: str, branch: str = "main") -> str:
         token = await self._get_cached_installation_token()
         async with self._build_client(token=token) as client:
-            response = await client.get(f"/repos/{repo_full_name}/git/ref/heads/{branch}")
-        data = response.json()
-        sha = data.get("object", {}).get("sha")
-        if not isinstance(sha, str):
-            raise GitHubAppError("Unable to fetch branch head SHA")
-        return sha
+            return await self._fetch_branch_head_sha(
+                client=client,
+                repo_full_name=repo_full_name,
+                branch=branch,
+            )
+
+    async def _fetch_branch_head_sha(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        repo_full_name: str,
+        branch: str,
+        attempts: int = 5,
+        initial_delay_seconds: float = 0.5,
+    ) -> str:
+        """Fetch the head commit SHA for ``branch`` with basic retry logic."""
+
+        delay = initial_delay_seconds
+        for attempt in range(attempts):
+            response = await client.get(
+                f"/repos/{repo_full_name}/git/ref/heads/{branch}"
+            )
+            if response.status_code == 200:
+                data = response.json()
+                branch_object = data.get("object", {})
+                sha = branch_object.get("sha")
+                if isinstance(sha, str):
+                    return sha
+
+            if response.status_code == 404:
+                branch_response = await client.get(
+                    f"/repos/{repo_full_name}/branches/{branch}"
+                )
+                if branch_response.status_code == 200:
+                    branch_data = branch_response.json()
+                    commit = branch_data.get("commit", {})
+                    sha = commit.get("sha")
+                    if isinstance(sha, str):
+                        return sha
+
+            if attempt < attempts - 1:
+                await asyncio.sleep(delay)
+                delay *= 2
+
+        raise GitHubAppError("Unable to determine seed main branch SHA")
 
     async def create_candidate_repository(
         self,
@@ -479,6 +568,22 @@ class GitHubAppClient:
             await client.patch(
                 f"/repos/{repo_full_name}", json={"archived": True, "default_branch": "main"}
             )
+
+    async def fetch_installation(self, installation_id: Optional[int] = None) -> dict[str, Any]:
+        target_id = installation_id if installation_id is not None else self.installation_id
+        app_jwt = self._ensure_app_jwt()
+        async with httpx.AsyncClient(
+            base_url=self._settings.api_base_url,
+            timeout=self._settings.request_timeout_seconds,
+        ) as client:
+            response = await self._request(
+                client,
+                "GET",
+                f"/app/installations/{target_id}",
+                token=app_jwt,
+                token_is_app=True,
+            )
+        return response.json()
 
 
 @lru_cache

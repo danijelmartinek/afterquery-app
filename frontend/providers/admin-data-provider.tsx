@@ -21,6 +21,7 @@ import type {
   AdminUser,
   OrgProfile,
   AdminMembership,
+  GitHubInstallation,
 } from "@/lib/types";
 import { useSupabaseAuth } from "./supabase-provider";
 
@@ -31,6 +32,7 @@ type AdminDataState = {
   candidateRepos: CandidateRepo[];
   reviewComments: ReviewComment[];
   emailTemplates: EmailTemplate[];
+  githubInstallation: GitHubInstallation | null;
 };
 
 type AdminDataAction =
@@ -43,7 +45,8 @@ type AdminDataAction =
       type: "updateInvitationStatus";
       payload: { invitationId: string; status: Invitation["status"]; submittedAt?: string };
     }
-  | { type: "upsertEmailTemplate"; payload: EmailTemplate };
+  | { type: "upsertEmailTemplate"; payload: EmailTemplate }
+  | { type: "setGitHubInstallation"; payload: GitHubInstallation | null };
 
 type WorkspaceStatus = "loading" | "needs_org" | "pending_approval" | "ready";
 
@@ -56,6 +59,7 @@ const AdminDataContext = createContext<
       membership: AdminMembership | null;
       workspaceStatus: WorkspaceStatus;
       loading: boolean;
+      githubInstallation: GitHubInstallation | null;
     })
   | undefined
 >(undefined);
@@ -68,6 +72,7 @@ function createEmptyState(): AdminDataState {
     candidateRepos: [],
     reviewComments: [],
     emailTemplates: [],
+    githubInstallation: null,
   };
 }
 
@@ -116,6 +121,8 @@ function reducer(state: AdminDataState, action: AdminDataAction): AdminDataState
         emailTemplates: [action.payload, ...filtered],
       };
     }
+    case "setGitHubInstallation":
+      return { ...state, githubInstallation: action.payload };
     default:
       return state;
   }
@@ -206,6 +213,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
             candidateRepos: data.candidateRepos ?? [],
             reviewComments: data.reviewComments ?? [],
             emailTemplates: data.emailTemplates ?? [],
+            githubInstallation: data.githubInstallation ?? null,
           },
         });
         setCurrentAdmin(data.currentAdmin ?? supabaseAdmin ?? null);
@@ -248,6 +256,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       membership,
       workspaceStatus,
       loading: loadingState,
+      githubInstallation: state.githubInstallation,
     }),
     [state, currentAdmin, org, membership, workspaceStatus, loadingState],
   );
