@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from pathlib import Path
 from typing import Iterable
 
@@ -12,8 +13,31 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 LOGGER = logging.getLogger(__name__)
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = _REPO_ROOT / "db" / "schema.sql"
+
+
+def _detect_schema_path() -> Path:
+    """Locate the schema file relative to the current module."""
+
+    env_override = os.environ.get("APP_SCHEMA_PATH")
+    if env_override:
+        return Path(env_override)
+
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        candidate = parent / "db" / "schema.sql"
+        if candidate.exists():
+            return candidate
+
+    # Fallback to the historical location two levels up; this keeps behaviour
+    # unchanged for environments that intentionally manage the schema file
+    # elsewhere and rely on the error handling below when it is missing.
+    try:
+        return current.parents[2] / "db" / "schema.sql"
+    except IndexError:  # pragma: no cover - defensive fallback
+        return current.parent / "db" / "schema.sql"
+
+
+SCHEMA_PATH = _detect_schema_path()
 
 _MIGRATION_TABLE_SQL = (
     "CREATE TABLE IF NOT EXISTS app_schema_migrations ("
