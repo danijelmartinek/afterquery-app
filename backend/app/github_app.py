@@ -212,7 +212,7 @@ class GitHubAppClient:
             timeout=self._settings.request_timeout_seconds,
         )
 
-    async def _run_git(self, *args: str, cwd: Optional[str] = None) -> None:
+    async def _run_git(self, *args: str, cwd: Optional[str] = None) -> str:
         """Execute ``git`` and raise :class:`GitHubAppError` on failure."""
 
         sanitized_args = [
@@ -232,6 +232,7 @@ class GitHubAppClient:
                     " ".join(sanitized_args), stderr.decode().strip()
                 )
             )
+        return stdout.decode().strip()
 
     async def _clone_and_push(
         self,
@@ -240,9 +241,10 @@ class GitHubAppClient:
         source_branch: str,
         destination_url: str,
         destination_branch: str,
-    ) -> None:
+    ) -> str:
         temp_dir = tempfile.mkdtemp(prefix="afterquery-seed-")
         repo_dir = f"{temp_dir}/repo.git"
+        branch_sha: Optional[str] = None
         try:
             await self._run_git(
                 "clone",
@@ -250,6 +252,15 @@ class GitHubAppClient:
                 source_url,
                 repo_dir,
             )
+
+            rev_parse_output = await self._run_git(
+                "rev-parse",
+                f"refs/heads/{source_branch}",
+                cwd=repo_dir,
+            )
+            branch_sha = rev_parse_output.strip() or None
+            if branch_sha is None:
+                raise GitHubAppError("Unable to determine seed branch SHA from source")
 
             await self._run_git(
                 "remote",
@@ -266,6 +277,7 @@ class GitHubAppClient:
                 "origin",
                 cwd=repo_dir,
             )
+            return branch_sha
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -382,7 +394,7 @@ class GitHubAppClient:
         destination_clone_url = (
             f"https://x-access-token:{token}@github.com/{seed_repo_full_name}.git"
         )
-        await self._clone_and_push(
+        branch_sha = await self._clone_and_push(
             source_url=source_clone_url,
             source_branch=source_default_branch,
             destination_url=destination_clone_url,
@@ -415,11 +427,14 @@ class GitHubAppClient:
                 },
             )
 
-            sha = await self._fetch_branch_head_sha(
-                client=client,
-                repo_full_name=seed_repo_full_name,
-                branch=default_branch,
-            )
+            try:
+                sha = await self._fetch_branch_head_sha(
+                    client=client,
+                    repo_full_name=seed_repo_full_name,
+                    branch=default_branch,
+                )
+            except GitHubAppError:
+                sha = branch_sha
 
         full_name = repo_data.get("full_name")
         if not isinstance(full_name, str):

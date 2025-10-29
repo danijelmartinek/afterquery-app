@@ -121,6 +121,7 @@ class GitHubInstallation(Base, TimestampMixin):
 class GitHubInstallationState(Base, TimestampMixin):
     __tablename__ = "github_installation_states"
     __table_args__ = (Index("idx_github_installation_states_org_id", "org_id"),)
+    __mapper_args__ = {"confirm_deleted_rows": False}
 
     token: Mapped[str] = mapped_column(String, primary_key=True)
     org_id: Mapped[uuid.UUID] = mapped_column(
