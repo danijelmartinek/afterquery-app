@@ -9,12 +9,17 @@ advantage of SQLAlchemy's async support we convert the DSN to the
 
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from dotenv import find_dotenv, load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from . import migrations
+
+logger = logging.getLogger(__name__)
 
 # Load DATABASE_URL and other environment variables from the project root ``.env``
 # file, if present. ``find_dotenv`` walks up from the current working directory,
@@ -58,6 +63,14 @@ ASYNC_SESSION_FACTORY = async_sessionmaker(
 @asynccontextmanager
 async def lifespan(app):  # pragma: no cover - FastAPI hook
     """Ensure the database engine is disposed when the app shuts down."""
+
+    try:
+        applied, _ = await migrations.ensure_schema(ASYNC_ENGINE)
+        if applied:
+            logger.info("Database schema applied during startup")
+    except RuntimeError as exc:
+        logger.exception("Failed to apply database schema during startup")
+        raise
 
     yield
     await ASYNC_ENGINE.dispose()

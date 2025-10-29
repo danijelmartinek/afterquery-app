@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .. import models, schemas, utils
+from .. import migrations, models, schemas, utils
 from ..services.github_installations import github_installation_to_schema
 from ..services.email import (
     CANDIDATE_ASSESSMENT_STARTED_TEMPLATE_KEY,
@@ -38,7 +38,6 @@ _EMAIL_TEMPLATE_METADATA: dict[str, dict[str, str]] = {
 }
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_SCHEMA_PATH = _REPO_ROOT / "db" / "schema.sql"
 _DEMO_DATA_PATH = _REPO_ROOT / "db" / "demo_seed_data.json"
 
 
@@ -158,23 +157,11 @@ async def _apply_schema() -> int:
     """Execute the schema SQL file against the connected database."""
 
     try:
-        schema_sql = _SCHEMA_PATH.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:  # pragma: no cover - developer misconfiguration
-        raise HTTPException(status_code=500, detail="Database schema file not found") from exc
+        _, bytes_applied = await migrations.ensure_schema(ASYNC_ENGINE)
+    except RuntimeError as exc:  # pragma: no cover - developer misconfiguration
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    if not schema_sql.strip():
-        return 0
-
-    statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
-
-    if not statements:
-        return 0
-
-    async with ASYNC_ENGINE.begin() as conn:
-        for statement in statements:
-            await conn.exec_driver_sql(statement)
-
-    return len(schema_sql)
+    return bytes_applied
 
 
 def _load_demo_data() -> dict:
@@ -399,7 +386,7 @@ async def bootstrap_database(
 
     return schemas.BootstrapResponse(
         migrated=applied_bytes > 0,
-        schema_path=str(_SCHEMA_PATH),
+        schema_path=str(migrations.SCHEMA_PATH),
         seed=seed_summary,
     )
 
