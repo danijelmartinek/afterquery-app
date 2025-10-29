@@ -415,14 +415,11 @@ class GitHubAppClient:
                 },
             )
 
-            branch_response = await client.get(
-                f"/repos/{seed_repo_full_name}/git/ref/heads/{default_branch}"
+            sha = await self._fetch_branch_head_sha(
+                client=client,
+                repo_full_name=seed_repo_full_name,
+                branch=default_branch,
             )
-            branch_data = branch_response.json()
-            branch_object = branch_data.get("object", {})
-            sha = branch_object.get("sha")
-            if not isinstance(sha, str):
-                raise GitHubAppError("Unable to determine seed main branch SHA")
 
         full_name = repo_data.get("full_name")
         if not isinstance(full_name, str):
@@ -448,12 +445,51 @@ class GitHubAppClient:
     async def refresh_branch_sha(self, repo_full_name: str, branch: str = "main") -> str:
         token = await self._get_cached_installation_token()
         async with self._build_client(token=token) as client:
-            response = await client.get(f"/repos/{repo_full_name}/git/ref/heads/{branch}")
-        data = response.json()
-        sha = data.get("object", {}).get("sha")
-        if not isinstance(sha, str):
-            raise GitHubAppError("Unable to fetch branch head SHA")
-        return sha
+            return await self._fetch_branch_head_sha(
+                client=client,
+                repo_full_name=repo_full_name,
+                branch=branch,
+            )
+
+    async def _fetch_branch_head_sha(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        repo_full_name: str,
+        branch: str,
+        attempts: int = 5,
+        initial_delay_seconds: float = 0.5,
+    ) -> str:
+        """Fetch the head commit SHA for ``branch`` with basic retry logic."""
+
+        delay = initial_delay_seconds
+        for attempt in range(attempts):
+            response = await client.get(
+                f"/repos/{repo_full_name}/git/ref/heads/{branch}"
+            )
+            if response.status_code == 200:
+                data = response.json()
+                branch_object = data.get("object", {})
+                sha = branch_object.get("sha")
+                if isinstance(sha, str):
+                    return sha
+
+            if response.status_code == 404:
+                branch_response = await client.get(
+                    f"/repos/{repo_full_name}/branches/{branch}"
+                )
+                if branch_response.status_code == 200:
+                    branch_data = branch_response.json()
+                    commit = branch_data.get("commit", {})
+                    sha = commit.get("sha")
+                    if isinstance(sha, str):
+                        return sha
+
+            if attempt < attempts - 1:
+                await asyncio.sleep(delay)
+                delay *= 2
+
+        raise GitHubAppError("Unable to determine seed main branch SHA")
 
     async def create_candidate_repository(
         self,
