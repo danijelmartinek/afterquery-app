@@ -16,12 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all project files
 COPY backend/ ./backend/
 COPY db/ ./db/
-COPY docs/ ./docs/
-COPY frontend/ ./frontend/
-COPY .env* ./
-COPY README.md ./
-COPY docker-compose.yml ./
-COPY vercel.json ./
 
 EXPOSE 8000
 
